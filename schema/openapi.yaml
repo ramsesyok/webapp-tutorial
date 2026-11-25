@@ -1,0 +1,234 @@
+openapi: 3.0.3
+info:
+  title: 世界の行きたい場所 API
+  version: 1.0.0
+  description: 世界地図にピンを置いて、行きたい場所を登録・検索するための教材用APIです。
+servers:
+  - url: /api
+
+paths:
+  /places:
+    get:
+      operationId: listPlaces
+      summary: 場所の一覧を取得・検索する
+      description: |
+        指定された検索条件をすべて満たす場所を、IDの昇順で返します。
+        条件を省略すると全件を返します。メモを表示・編集するときは詳細を取得してください。
+      parameters:
+        - name: q
+          in: query
+          description: |
+            名前またはメモの部分一致です。検索語の前後の空白を取り除き、
+            英字の大文字と小文字を区別しません。空文字や空白のみの場合はキーワードによる絞り込みを行いません。
+          schema:
+            type: string
+            maxLength: 100
+          example: ベルリン
+        - name: category
+          in: query
+          description: カテゴリの完全一致。すべてのカテゴリを対象にする場合は、このパラメータを省略します。
+          schema:
+            $ref: '#/components/schemas/Category'
+      responses:
+        '200':
+          description: 検索結果。該当する場所がなければ空配列を返します。
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PlaceSummary'
+              examples:
+                matches:
+                  summary: 1件見つかった場合
+                  value:
+                    - id: 1
+                      name: ブランデンブルク門
+                      category: sightseeing
+                      longitude: 13.3777
+                      latitude: 52.5163
+                empty:
+                  summary: 該当する場所がない場合
+                  value: []
+        '400':
+          $ref: '#/components/responses/BadRequest'
+    post:
+      operationId: createPlace
+      summary: 場所を登録する
+      requestBody:
+        $ref: '#/components/requestBodies/PlaceInput'
+      responses:
+        '201':
+          description: 登録した場所。
+          headers:
+            Location:
+              description: 登録した場所の取得先。
+              schema:
+                type: string
+              example: /api/places/1
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Place'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /places/{placeId}:
+    parameters:
+      - name: placeId
+        in: path
+        required: true
+        description: サーバーが発行した場所のID。
+        schema:
+          $ref: '#/components/schemas/PlaceId'
+    get:
+      operationId: getPlace
+      summary: 場所を1件取得する
+      responses:
+        '200':
+          description: 指定した場所。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Place'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      operationId: updatePlace
+      summary: 場所の登録内容を更新する
+      description: 指定した場所の編集項目をすべて置き換えます。場所のIDはサーバーが保持し、存在しないIDには404を返します。
+      requestBody:
+        $ref: '#/components/requestBodies/PlaceInput'
+      responses:
+        '200':
+          description: 更新後の場所。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Place'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      operationId: deletePlace
+      summary: 場所を削除する
+      responses:
+        '204':
+          description: 削除しました。レスポンスボディはありません。
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  schemas:
+    PlaceId:
+      type: integer
+      format: int32
+      minimum: 1
+      maximum: 2147483647
+      example: 1
+    Category:
+      type: string
+      description: sightseeing は観光、nature は自然、food は食事。
+      enum: [sightseeing, nature, food]
+      example: sightseeing
+    PlaceMapFields:
+      type: object
+      required: [name, category, longitude, latitude]
+      properties:
+        name:
+          type: string
+          description: 場所の名前。空白のみの値は400になります。
+          minLength: 1
+          maxLength: 80
+          pattern: '\S'
+          example: ブランデンブルク門
+        category:
+          $ref: '#/components/schemas/Category'
+        longitude:
+          type: number
+          format: double
+          description: 経度（度）。
+          minimum: -180
+          maximum: 180
+          example: 13.3777
+        latitude:
+          type: number
+          format: double
+          description: 緯度（度）。背景地図のWebメルカトル表示範囲に合わせます。
+          minimum: -85.051129
+          maximum: 85.051129
+          example: 52.5163
+    Memo:
+      type: string
+      description: 場所のメモ。メモがない場合は空文字を指定します。
+      maxLength: 500
+      example: ベルリン観光の初日に訪れたい
+    PlaceInput:
+      allOf:
+        - $ref: '#/components/schemas/PlaceMapFields'
+        - type: object
+          required: [memo]
+          properties:
+            memo:
+              $ref: '#/components/schemas/Memo'
+    PlaceSummary:
+      allOf:
+        - $ref: '#/components/schemas/PlaceMapFields'
+        - type: object
+          required: [id]
+          properties:
+            id:
+              $ref: '#/components/schemas/PlaceId'
+    Place:
+      allOf:
+        - $ref: '#/components/schemas/PlaceSummary'
+        - type: object
+          required: [memo]
+          properties:
+            memo:
+              $ref: '#/components/schemas/Memo'
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          enum: [INVALID_INPUT, PLACE_NOT_FOUND]
+        message:
+          type: string
+  requestBodies:
+    PlaceInput:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PlaceInput'
+          example:
+            name: ブランデンブルク門
+            category: sightseeing
+            longitude: 13.3777
+            latitude: 52.5163
+            memo: ベルリン観光の初日に訪れたい
+  responses:
+    BadRequest:
+      description: パス、クエリ、リクエストボディのいずれかが不正です。
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: INVALID_INPUT
+            message: longitude は -180 以上 180 以下で指定してください。
+    NotFound:
+      description: 指定したIDの場所が見つかりません。
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: PLACE_NOT_FOUND
+            message: 指定した場所が見つかりません。
