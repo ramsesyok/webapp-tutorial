@@ -12,12 +12,24 @@ import (
 	middleware "github.com/oapi-codegen/nethttp-middleware"
 )
 
-const invalidPlaceBody = "リクエストボディを application/json のJSONオブジェクトで送信してください。"
+const invalidJSONBody = "リクエストボディを application/json のJSONオブジェクトで送信してください。"
 
 func writeValidationError(_ context.Context, err error, w http.ResponseWriter, _ *http.Request, _ middleware.ErrorHandlerOpts) {
-	// The validator reports path and query errors before body errors.
+	// The validator reports authentication, path and query errors before body errors.
 	if validationErrors, ok := err.(openapi3.MultiError); ok {
 		err = validationErrors[0]
+	}
+	var securityError *openapi3filter.SecurityRequirementsError
+	if errors.As(err, &securityError) {
+		if !errors.Is(err, errUnauthenticated) {
+			databaseError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusUnauthorized, Error{
+			Code:    UNAUTHENTICATED,
+			Message: "ログインしてください。",
+		})
+		return
 	}
 	requestError, ok := err.(*openapi3filter.RequestError)
 	if !ok || requestError.RequestBody == nil {
@@ -29,7 +41,7 @@ func writeValidationError(_ context.Context, err error, w http.ResponseWriter, _
 	fields := make(map[string]string)
 	collectFieldErrors(requestError.Err, fields)
 	if len(fields) == 0 {
-		badRequest(w, invalidPlaceBody)
+		badRequest(w, invalidJSONBody)
 		return
 	}
 	writeJSON(w, http.StatusBadRequest, Error{

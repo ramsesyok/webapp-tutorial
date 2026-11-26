@@ -1,0 +1,396 @@
+openapi: 3.0.3
+info:
+  title: 訪問拠点 API（学習レベル2）
+  version: 2.0.0
+  description: 配布されたアカウントでログインし、地図上の訪問拠点を登録・検索・編集する教材用APIです。
+servers:
+  - url: /api
+security:
+  - sessionCookie: []
+
+paths:
+  /session:
+    post:
+      operationId: createSession
+      summary: ログインする
+      description: 配布されたログインIDとパスワードを送信すると、ブラウザーにセッションCookieが設定されます。
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginInput'
+      responses:
+        '200':
+          description: ログインしたユーザー。
+          headers:
+            Set-Cookie:
+              description: ブラウザーに設定する HttpOnly・SameSite=Lax のセッションCookie。
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          description: ログインIDまたはパスワードが正しくありません。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: INVALID_CREDENTIALS
+                message: ログインIDまたはパスワードが正しくありません。
+        '403':
+          $ref: '#/components/responses/InvalidOrigin'
+    get:
+      operationId: getSession
+      summary: ログイン中のユーザーを取得する
+      responses:
+        '200':
+          description: ログイン中のユーザー。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    delete:
+      operationId: deleteSession
+      summary: ログアウトする
+      responses:
+        '204':
+          description: セッションを失効しました。レスポンスボディはありません。
+          headers:
+            Set-Cookie:
+              description: ブラウザーのセッションCookieを削除します。
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/InvalidOrigin'
+  /places:
+    get:
+      operationId: listPlaces
+      summary: 場所の一覧を取得・検索する
+      description: |
+        指定された検索条件をすべて満たす場所を、IDの昇順で返します。
+        条件を省略すると全件を返します。メモを表示・編集するときは詳細を取得してください。
+      parameters:
+        - name: q
+          in: query
+          description: |
+            名前またはメモの部分一致です。検索語の前後の空白を取り除き、
+            英字の大文字と小文字を区別しません。空文字や空白のみの場合はキーワードによる絞り込みを行いません。
+          schema:
+            type: string
+            maxLength: 100
+          example: ベルリン
+        - name: category
+          in: query
+          description: カテゴリの完全一致。すべてのカテゴリを対象にする場合は、このパラメータを省略します。
+          schema:
+            $ref: '#/components/schemas/Category'
+      responses:
+        '200':
+          description: 検索結果。該当する場所がなければ空配列を返します。
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PlaceSummary'
+              examples:
+                matches:
+                  summary: 1件見つかった場合
+                  value:
+                    - id: 1
+                      name: ブランデンブルク門
+                      category: sightseeing
+                      longitude: 13.3777
+                      latitude: 52.5163
+                empty:
+                  summary: 該当する場所がない場合
+                  value: []
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      operationId: createPlace
+      summary: 場所を登録する
+      requestBody:
+        $ref: '#/components/requestBodies/PlaceInput'
+      responses:
+        '201':
+          description: 登録した場所。
+          headers:
+            Location:
+              description: 登録した場所の取得先。
+              schema:
+                type: string
+              example: /api/places/1
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Place'
+        '400':
+          $ref: '#/components/responses/InvalidPlaceInput'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/InvalidOrigin'
+  /places/{placeId}:
+    parameters:
+      - name: placeId
+        in: path
+        required: true
+        description: サーバーが発行した場所のID。
+        schema:
+          $ref: '#/components/schemas/PlaceId'
+    get:
+      operationId: getPlace
+      summary: 場所を1件取得する
+      responses:
+        '200':
+          description: 指定した場所。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Place'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      operationId: updatePlace
+      summary: 場所の登録内容を更新する
+      description: 指定した場所の編集項目をすべて置き換えます。場所のIDはサーバーが保持し、存在しないIDには404を返します。
+      requestBody:
+        $ref: '#/components/requestBodies/PlaceInput'
+      responses:
+        '200':
+          description: 更新後の場所。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Place'
+        '400':
+          $ref: '#/components/responses/InvalidPlaceInput'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/InvalidOrigin'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      operationId: deletePlace
+      summary: 場所を削除する
+      responses:
+        '204':
+          description: 削除しました。レスポンスボディはありません。
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/InvalidOrigin'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: tutorial_session
+      description: >
+        POST /session でログインすると、同一オリジンへのリクエストにはブラウザーが自動的にCookieを送ります。
+        Swagger UIでも POST /session からログインしてください。
+  schemas:
+    LoginInput:
+      type: object
+      required: [loginId, password]
+      additionalProperties: false
+      properties:
+        loginId:
+          type: string
+          minLength: 1
+          maxLength: 64
+          example: student
+        password:
+          type: string
+          format: password
+          writeOnly: true
+          minLength: 1
+          maxLength: 128
+    User:
+      type: object
+      required: [id, loginId]
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        loginId:
+          type: string
+          example: student
+    PlaceId:
+      type: integer
+      format: int32
+      minimum: 1
+      maximum: 2147483647
+      example: 1
+    Category:
+      type: string
+      description: sightseeing は観光、nature は自然、food は食事。
+      enum: [sightseeing, nature, food]
+      example: sightseeing
+    PlaceMapFields:
+      type: object
+      required: [name, category, longitude, latitude]
+      properties:
+        name:
+          type: string
+          description: 場所の名前。Unicodeの空白文字のみの値は400になります。
+          minLength: 1
+          maxLength: 80
+          pattern: '[^\t-\r \u0085\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]'
+          example: ブランデンブルク門
+        category:
+          $ref: '#/components/schemas/Category'
+        longitude:
+          type: number
+          format: double
+          description: 経度（度）。
+          minimum: -180
+          maximum: 180
+          example: 13.3777
+        latitude:
+          type: number
+          format: double
+          description: 緯度（度）。背景地図のWebメルカトル表示範囲に合わせます。
+          minimum: -85.051129
+          maximum: 85.051129
+          example: 52.5163
+    Memo:
+      type: string
+      description: 場所のメモ。メモがない場合は空文字を指定します。
+      maxLength: 500
+      example: ベルリン観光の初日に訪れたい
+    PlaceInput:
+      allOf:
+        - $ref: '#/components/schemas/PlaceMapFields'
+        - type: object
+          required: [memo]
+          properties:
+            memo:
+              $ref: '#/components/schemas/Memo'
+    PlaceSummary:
+      allOf:
+        - $ref: '#/components/schemas/PlaceMapFields'
+        - type: object
+          required: [id]
+          properties:
+            id:
+              $ref: '#/components/schemas/PlaceId'
+    Place:
+      allOf:
+        - $ref: '#/components/schemas/PlaceSummary'
+        - type: object
+          required: [memo]
+          properties:
+            memo:
+              $ref: '#/components/schemas/Memo'
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          enum: [INVALID_INPUT, INVALID_CREDENTIALS, UNAUTHENTICATED, INVALID_ORIGIN, PLACE_NOT_FOUND]
+        message:
+          type: string
+        fieldErrors:
+          type: object
+          description: |
+            入力欄ごとのエラーです。キーはリクエストの項目名、値はその欄に表示する理由です。
+            JSONの形式やパスなど、入力欄に対応しないエラーだけの場合は省略します。
+          additionalProperties:
+            type: string
+  requestBodies:
+    PlaceInput:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PlaceInput'
+          example:
+            name: ブランデンブルク門
+            category: sightseeing
+            longitude: 13.3777
+            latitude: 52.5163
+            memo: ベルリン観光の初日に訪れたい
+  responses:
+    Unauthorized:
+      description: ログインしていないか、セッションの期限が切れています。
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: UNAUTHENTICATED
+            message: ログインしてください。
+    InvalidOrigin:
+      description: 更新リクエストの Origin が欠落しているか、許可されていません。
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: INVALID_ORIGIN
+            message: このオリジンからの更新は許可されていません。
+    BadRequest:
+      description: パス、クエリ、リクエストボディのいずれかが不正です。
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: INVALID_INPUT
+            message: 検索条件が正しくありません。
+    InvalidPlaceInput:
+      description: URLまたはリクエストボディが不正です。入力欄に対応する問題は fieldErrors で返します。
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            invalidFields:
+              summary: 緯度が範囲外でメモが未指定の場合
+              value:
+                code: INVALID_INPUT
+                message: 入力内容を確認してください。
+                fieldErrors:
+                  latitude: -85.051129 以上 85.051129 以下の数値を入力してください。
+                  memo: 必須項目です。
+            invalidBody:
+              summary: JSONの形式が不正な場合
+              value:
+                code: INVALID_INPUT
+                message: リクエストボディを application/json のJSONオブジェクトで送信してください。
+    NotFound:
+      description: 指定したIDの場所が見つかりません。
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: PLACE_NOT_FOUND
+            message: 指定した場所が見つかりません。

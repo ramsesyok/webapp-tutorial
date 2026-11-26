@@ -6,10 +6,15 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
 	"github.com/oapi-codegen/runtime"
+)
+
+const (
+	SessionCookieScopes = "sessionCookie.Scopes"
 )
 
 // Defines values for Category.
@@ -21,8 +26,11 @@ const (
 
 // Defines values for ErrorCode.
 const (
-	INVALIDINPUT  ErrorCode = "INVALID_INPUT"
-	PLACENOTFOUND ErrorCode = "PLACE_NOT_FOUND"
+	INVALIDCREDENTIALS ErrorCode = "INVALID_CREDENTIALS"
+	INVALIDINPUT       ErrorCode = "INVALID_INPUT"
+	INVALIDORIGIN      ErrorCode = "INVALID_ORIGIN"
+	PLACENOTFOUND      ErrorCode = "PLACE_NOT_FOUND"
+	UNAUTHENTICATED    ErrorCode = "UNAUTHENTICATED"
 )
 
 // Category sightseeing は観光、nature は自然、food は食事。
@@ -32,8 +40,7 @@ type Category string
 type Error struct {
 	Code ErrorCode `json:"code"`
 
-	// FieldErrors 登録・更新の入力欄ごとのエラーです。キーはリクエストの項目名
-	// （name、category、longitude、latitude、memo）、値はその欄に表示する理由です。
+	// FieldErrors 入力欄ごとのエラーです。キーはリクエストの項目名、値はその欄に表示する理由です。
 	// JSONの形式やパスなど、入力欄に対応しないエラーだけの場合は省略します。
 	FieldErrors *map[string]string `json:"fieldErrors,omitempty"`
 	Message     string             `json:"message"`
@@ -41,6 +48,12 @@ type Error struct {
 
 // ErrorCode defines model for Error.Code.
 type ErrorCode string
+
+// LoginInput defines model for LoginInput.
+type LoginInput struct {
+	LoginId  string  `json:"loginId"`
+	Password *string `json:"password,omitempty"`
+}
 
 // Memo 場所のメモ。メモがない場合は空文字を指定します。
 type Memo = string
@@ -116,14 +129,26 @@ type PlaceSummary struct {
 	Name string `json:"name"`
 }
 
+// User defines model for User.
+type User struct {
+	Id      int64  `json:"id"`
+	LoginId string `json:"loginId"`
+}
+
 // BadRequest defines model for BadRequest.
 type BadRequest = Error
+
+// InvalidOrigin defines model for InvalidOrigin.
+type InvalidOrigin = Error
 
 // InvalidPlaceInput defines model for InvalidPlaceInput.
 type InvalidPlaceInput = Error
 
 // NotFound defines model for NotFound.
 type NotFound = Error
+
+// Unauthorized defines model for Unauthorized.
+type Unauthorized = Error
 
 // ListPlacesParams defines parameters for ListPlaces.
 type ListPlacesParams struct {
@@ -140,6 +165,9 @@ type CreatePlaceJSONRequestBody = PlaceInput
 
 // UpdatePlaceJSONRequestBody defines body for UpdatePlace for application/json ContentType.
 type UpdatePlaceJSONRequestBody = PlaceInput
+
+// CreateSessionJSONRequestBody defines body for CreateSession for application/json ContentType.
+type CreateSessionJSONRequestBody = LoginInput
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -158,6 +186,15 @@ type ServerInterface interface {
 	// 場所の登録内容を更新する
 	// (PUT /places/{placeId})
 	UpdatePlace(w http.ResponseWriter, r *http.Request, placeId PlaceId)
+	// ログアウトする
+	// (DELETE /session)
+	DeleteSession(w http.ResponseWriter, r *http.Request)
+	// ログイン中のユーザーを取得する
+	// (GET /session)
+	GetSession(w http.ResponseWriter, r *http.Request)
+	// ログインする
+	// (POST /session)
+	CreateSession(w http.ResponseWriter, r *http.Request)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -173,6 +210,12 @@ type MiddlewareFunc func(http.Handler) http.Handler
 func (siw *ServerInterfaceWrapper) ListPlaces(w http.ResponseWriter, r *http.Request) {
 
 	var err error
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params ListPlacesParams
@@ -207,6 +250,12 @@ func (siw *ServerInterfaceWrapper) ListPlaces(w http.ResponseWriter, r *http.Req
 // CreatePlace operation middleware
 func (siw *ServerInterfaceWrapper) CreatePlace(w http.ResponseWriter, r *http.Request) {
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreatePlace(w, r)
 	}))
@@ -231,6 +280,12 @@ func (siw *ServerInterfaceWrapper) DeletePlace(w http.ResponseWriter, r *http.Re
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "placeId", Err: err})
 		return
 	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.DeletePlace(w, r, placeId)
@@ -257,6 +312,12 @@ func (siw *ServerInterfaceWrapper) GetPlace(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetPlace(w, r, placeId)
 	}))
@@ -282,8 +343,68 @@ func (siw *ServerInterfaceWrapper) UpdatePlace(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdatePlace(w, r, placeId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteSession operation middleware
+func (siw *ServerInterfaceWrapper) DeleteSession(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteSession(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetSession operation middleware
+func (siw *ServerInterfaceWrapper) GetSession(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetSession(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateSession operation middleware
+func (siw *ServerInterfaceWrapper) CreateSession(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateSession(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -418,6 +539,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc("DELETE "+options.BaseURL+"/places/{placeId}", wrapper.DeletePlace)
 	m.HandleFunc("GET "+options.BaseURL+"/places/{placeId}", wrapper.GetPlace)
 	m.HandleFunc("PUT "+options.BaseURL+"/places/{placeId}", wrapper.UpdatePlace)
+	m.HandleFunc("DELETE "+options.BaseURL+"/session", wrapper.DeleteSession)
+	m.HandleFunc("GET "+options.BaseURL+"/session", wrapper.GetSession)
+	m.HandleFunc("POST "+options.BaseURL+"/session", wrapper.CreateSession)
 
 	return m
 }

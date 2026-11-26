@@ -4,26 +4,30 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 
 	_ "modernc.org/sqlite"
 )
 
-func openDatabase(filename string) (*sql.DB, error) {
+func openDatabase(filename, initialPassword string) (*sql.DB, error) {
 	db, err := sql.Open("sqlite", filename)
 	if err != nil {
 		return nil, err
 	}
 	// One connection is sufficient for the tutorial and serializes writes.
 	db.SetMaxOpenConns(1)
-	if err := initializeDatabase(db); err != nil {
+	if err := initializeDatabase(db, initialPassword); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("initialize SQLite: %w", err)
 	}
 	return db, nil
 }
 
-func initializeDatabase(db *sql.DB) error {
+func initializeDatabase(db *sql.DB, initialPassword string) error {
 	ctx := context.Background()
+	if _, err := db.ExecContext(ctx, "PRAGMA foreign_keys = ON"); err != nil {
+		return err
+	}
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -34,15 +38,16 @@ func initializeDatabase(db *sql.DB) error {
 	if err := tx.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil {
 		return err
 	}
-	if version == 1 {
+	if version == 2 {
 		return nil
 	}
-	if version != 0 {
+	if version != 0 && version != 1 {
 		return fmt.Errorf("unsupported database version %d", version)
 	}
 
-	// Seed only on first creation, so deleted places do not return on restart.
-	if _, err := tx.ExecContext(ctx, `
+	if version == 0 {
+		// Seed only on first creation, so deleted places do not return on restart.
+		if _, err := tx.ExecContext(ctx, `
 		CREATE TABLE places (
 			id INTEGER PRIMARY KEY AUTOINCREMENT CHECK (id <= 2147483647),
 			name TEXT NOT NULL,
@@ -55,11 +60,41 @@ func initializeDatabase(db *sql.DB) error {
 			('ブランデンブルク門', 'sightseeing', 13.3777, 52.5163, 'ベルリン観光の初日に訪れたい'),
 			('ベルリン動物園', 'nature', 13.3377, 52.5075, 'Zoologischer Garten Berlin'),
 			('台北の夜市', 'food', 121.5246, 25.0879, '屋台料理を食べたい');
-		PRAGMA user_version = 1;
+		`); err != nil {
+			return err
+		}
+	}
+
+	if _, err := tx.ExecContext(ctx, `
+		CREATE TABLE users (
+			id INTEGER PRIMARY KEY,
+			login_id TEXT NOT NULL UNIQUE,
+			password_salt BLOB NOT NULL,
+			password_hash BLOB NOT NULL
+		);
+		CREATE TABLE sessions (
+			token_hash BLOB PRIMARY KEY NOT NULL,
+			user_id INTEGER NOT NULL REFERENCES users(id),
+			expires_at INTEGER NOT NULL
+		);
+		PRAGMA user_version = 2;
 	`); err != nil {
 		return err
 	}
-	return tx.Commit()
+	generated := initialPassword == ""
+	if generated {
+		initialPassword = randomToken(18)
+	}
+	if err := insertInitialUser(ctx, tx, initialPassword); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	if generated {
+		log.Printf("Initial tutorial account (shown once): login ID %s, password %s", initialLoginID, initialPassword)
+	}
+	return nil
 }
 
 type rowScanner interface {
