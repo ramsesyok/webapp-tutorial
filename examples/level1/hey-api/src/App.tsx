@@ -10,18 +10,20 @@ import {
   Typography,
 } from '@mui/material';
 import { useEffect, useState, type FormEvent } from 'react';
+import { useForm } from 'react-hook-form';
 import { useSearchParams } from 'react-router';
 import { getApiError, usePlace, usePlaceMutations, usePlaces } from './api/use-places';
 import { useMapStore } from './map-store';
-import { PlaceEditor, type Editor } from './PlaceEditor';
+import { PlaceEditor } from './PlaceEditor';
 import { PlaceMap } from './PlaceMap';
 import {
-  categories, categoryColors, categoryLabels, coordinateFields, coordinateInput, coordinatesSchema,
-  getSearchFilters, getSelectedId,
-  type Category, type CoordinateFields, type Place, type PlaceInput, type PlaceSummary, type SearchFilters,
+  categories, categoryColors, categoryLabels, coordinateFields, getSearchFilters, getSelectedId,
+  placeDraft, resolvePlaceDraft,
+  type Category, type Coordinates, type Place, type PlaceDraft, type PlaceInput, type PlaceSummary, type SearchFilters,
 } from './places';
 
 const emptyPlaces: PlaceSummary[] = [];
+type Editor = { mode: 'create' } | { mode: 'edit'; placeId: number };
 
 type SearchProps = {
   filters: SearchFilters;
@@ -68,19 +70,36 @@ export function App() {
   const picking = useMapStore((state) => state.picking);
   const setPicking = useMapStore((state) => state.setPicking);
   const [editor, setEditor] = useState<Editor>();
-  const [saving, setSaving] = useState(false);
   const [toDelete, setToDelete] = useState<Place>();
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
   const [notice, setNotice] = useState('');
   const [shareUrl, setShareUrl] = useState('');
 
-  // 座標の下書きだけを、地図とフォームに共通する親で管理する。
-  const draftCoordinates = editor && coordinatesSchema.safeParse(coordinateInput(editor.coordinates));
+  const form = useForm<PlaceDraft, Editor['mode'], PlaceInput>({
+    defaultValues: placeDraft(),
+    resolver: resolvePlaceDraft,
+    context: editor?.mode ?? 'create',
+    reValidateMode: 'onSubmit',
+  });
 
-  function updateCoordinates(coordinates: CoordinateFields) {
-    if (saving) return;
-    setEditor((current) => current && { ...current, coordinates });
+  function openEditor(place?: Place, coordinates?: Coordinates) {
+    form.reset(placeDraft(place, coordinates));
+    setPicking(false);
+    setNotice('');
+    setEditor(place ? { mode: 'edit', placeId: place.id } : { mode: 'create' });
+  }
+
+  function cancelEditor() {
+    form.reset();
+    setEditor(undefined);
+  }
+
+  function updateCoordinates(coordinates: Coordinates) {
+    const { longitude, latitude } = coordinateFields(coordinates);
+    form.setValue('longitude', longitude, { shouldDirty: true });
+    form.setValue('latitude', latitude, { shouldDirty: true });
+    form.clearErrors(['longitude', 'latitude']);
   }
 
   // 書き込むのは共有URLだけ。再読み込みと履歴移動も同じ画面状態から復元する。
@@ -111,21 +130,16 @@ export function App() {
   }, [detail.isSuccess, list.isFetching, list.isSuccess, outsideResult, params, setParams]);
 
   async function save(input: PlaceInput) {
-    if (!editor || saving) return;
-    setSaving(true);
-    try {
-      if (editor.mode === 'create') {
-        const place = await mutations.create(input);
-        select(place.id);
-        setNotice('場所を登録しました。');
-      } else {
-        await mutations.update(editor.place.id, input);
-        setNotice('場所を更新しました。');
-      }
-      setEditor(undefined);
-    } finally {
-      setSaving(false);
+    if (!editor) return;
+    if (editor.mode === 'create') {
+      const place = await mutations.create(input);
+      select(place.id);
+      setNotice('場所を登録しました。');
+    } else {
+      await mutations.update(editor.placeId, input);
+      setNotice('場所を更新しました。');
     }
+    setEditor(undefined);
   }
 
   async function remove() {
@@ -182,23 +196,14 @@ export function App() {
           {picking && (
             <Alert severity="info" className="picking-alert" action={
               <Button color="inherit" size="small" onClick={() => setPicking(false)}>キャンセル</Button>
-            }>地図をクリックして登録位置を決めてください。<Button size="small" onClick={() => {
-              setPicking(false);
-              setEditor({ mode: 'create', coordinates: coordinateFields() });
-            }}>座標を入力</Button></Alert>
+            }>地図をクリックして登録位置を決めてください。<Button size="small" onClick={() => openEditor()}>座標を入力</Button></Alert>
           )}
           <PlaceMap places={places} selectedId={selectedId} selectedPlace={selectedPlace}
-            draft={editor && {
-              coordinates: draftCoordinates?.data,
-              placeId: editor.mode === 'edit' ? editor.place.id : undefined,
-              saving,
-            }}
+            control={form.control} editing={Boolean(editor)}
+            editingPlaceId={editor?.mode === 'edit' ? editor.placeId : undefined}
             onSelect={(id) => { if (!editor) select(id); }}
-            onPick={(coordinates) => {
-              setPicking(false);
-              setEditor({ mode: 'create', coordinates: coordinateFields(coordinates) });
-            }}
-            onDrag={(coordinates) => updateCoordinates(coordinateFields(coordinates))} />
+            onPick={(coordinates) => openEditor(undefined, coordinates)}
+            onDrag={updateCoordinates} />
           <div className="map-footer">
             {categories.map((category) => <span key={category}>
               <span className="category-dot" style={{ backgroundColor: categoryColors[category] }} />
@@ -210,8 +215,8 @@ export function App() {
 
         <div className="side-panel">
           {notice && <Alert severity="success" onClose={() => setNotice('')}>{notice}</Alert>}
-          {editor && <PlaceEditor editor={editor} saving={saving} onCoordinatesChange={updateCoordinates}
-            onClose={() => setEditor(undefined)} onSave={save} />}
+          {editor && <PlaceEditor mode={editor.mode} form={form}
+            onClose={cancelEditor} onSave={save} />}
           <Paper component="section" variant="outlined" aria-labelledby="list-title" hidden={Boolean(editor)}>
             <div className="panel-heading side-heading">
               <Typography id="list-title" variant="h6" component="h2" sx={{ fontWeight: 700 }}>場所を探す</Typography>
@@ -261,11 +266,7 @@ export function App() {
                   </Typography>
                   <Typography className="place-memo" variant="body2">{detail.data.memo || 'メモはありません。'}</Typography>
                   <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
-                    <Button size="small" variant="outlined" onClick={() => {
-                      setPicking(false);
-                      setNotice('');
-                      setEditor({ mode: 'edit', place: detail.data, coordinates: coordinateFields(detail.data) });
-                    }}>編集</Button>
+                    <Button size="small" variant="outlined" onClick={() => openEditor(detail.data)}>編集</Button>
                     <Button size="small" color="error" onClick={() => { setDeleteError(''); setToDelete(detail.data); }}>削除</Button>
                     <Button size="small" startIcon={<ContentCopyRounded />} onClick={copyLink}>URLをコピー</Button>
                   </Stack>

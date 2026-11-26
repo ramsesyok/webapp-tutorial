@@ -14,8 +14,12 @@ import VectorSource from 'ol/source/Vector.js';
 import { Circle, Fill, Stroke, Style } from 'ol/style.js';
 import { PMTilesVectorSource } from 'ol-pmtiles';
 import { useEffect, useRef, useState } from 'react';
+import { useFormState, useWatch } from 'react-hook-form';
 import { useMapStore } from './map-store';
-import { categoryColors, latitudeLimit, type Coordinates, type PlaceSummary } from './places';
+import {
+  categoryColors, coordinateInput, coordinatesSchema, latitudeLimit,
+  type Coordinates, type PlaceForm, type PlaceSummary,
+} from './places';
 
 const land = new Style({
   fill: new Fill({ color: '#eef0dd' }),
@@ -44,7 +48,9 @@ type Props = {
   places: PlaceSummary[];
   selectedId: number | undefined;
   selectedPlace: PlaceSummary | undefined;
-  draft?: { coordinates?: Coordinates; placeId?: number; saving: boolean };
+  control: PlaceForm['control'];
+  editing: boolean;
+  editingPlaceId?: number;
   onSelect: (id: number) => void;
   onPick: (coordinates: Coordinates) => void;
   onDrag: (coordinates: Coordinates) => void;
@@ -52,7 +58,7 @@ type Props = {
 
 export function PlaceMap(props: Props) {
   const target = useRef<HTMLDivElement>(null);
-  const { onSelect, onPick, onDrag } = props;
+  const { control, editing, editingPlaceId, onSelect, onPick, onDrag } = props;
   const actions = useRef({ onSelect, onPick, onDrag });
   const mapRef = useRef<Map | null>(null);
   const translateRef = useRef<Translate | null>(null);
@@ -60,6 +66,9 @@ export function PlaceMap(props: Props) {
   const [draftPin] = useState(() => new Feature<Point>());
   const [tileError, setTileError] = useState(false);
   const picking = useMapStore((state) => state.picking);
+  const { isSubmitting } = useFormState({ control });
+  // 地図はフォームの経度と緯度だけを購読する。
+  const [longitudeField, latitudeField] = useWatch({ control, name: ['longitude', 'latitude'] });
 
   useEffect(() => {
     actions.current = { onSelect, onPick, onDrag };
@@ -129,7 +138,6 @@ export function PlaceMap(props: Props) {
     };
   }, [draftPin, pins]);
 
-  const editingPlaceId = props.draft?.placeId;
   useEffect(() => {
     pins.clear();
     pins.addFeatures(props.places.filter((place) => place.id !== editingPlaceId).map((place) => {
@@ -148,14 +156,16 @@ export function PlaceMap(props: Props) {
     }));
   }, [editingPlaceId, pins, props.places, props.selectedId]);
 
-  const editing = props.draft !== undefined;
-  const canDrag = editing && !props.draft?.saving;
+  const canDrag = editing && !isSubmitting;
   useEffect(() => {
     translateRef.current?.setActive(canDrag);
   }, [canDrag]);
 
-  const draftLongitude = props.draft?.coordinates?.longitude;
-  const draftLatitude = props.draft?.coordinates?.latitude;
+  const draft = editing && coordinatesSchema.safeParse(coordinateInput({
+    longitude: longitudeField, latitude: latitudeField,
+  }));
+  const draftLongitude = draft ? draft.data?.longitude : undefined;
+  const draftLatitude = draft ? draft.data?.latitude : undefined;
   useEffect(() => {
     if (!editing) {
       draftPin.setGeometry(undefined);

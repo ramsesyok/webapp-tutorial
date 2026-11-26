@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { FieldErrors as FormErrors, Resolver, UseFormReturn } from 'react-hook-form';
 import {
   zCategory as categorySchema, zCreatePlaceBody as CreatePlaceBody,
   zPlaceMapFields as PlaceMapFields, zUpdatePlaceBody as UpdatePlaceBody,
@@ -26,11 +27,23 @@ export type PlaceSummary = Omit<Place, 'memo'>;
 export type SearchFilters = { q?: string; category?: Category };
 export type Coordinates = z.infer<typeof coordinatesSchema>;
 export type CoordinateFields = Record<keyof Coordinates, string>;
+export type PlaceDraft = Omit<PlaceInput, keyof Coordinates> & CoordinateFields;
+type EditorMode = 'create' | 'edit';
+export type PlaceForm = UseFormReturn<PlaceDraft, EditorMode, PlaceInput>;
 
 export function coordinateFields(coordinates?: Coordinates): CoordinateFields {
   return {
     longitude: coordinates?.longitude.toString() ?? '',
     latitude: coordinates?.latitude.toString() ?? '',
+  };
+}
+
+export function placeDraft(place?: Place, coordinates?: Coordinates): PlaceDraft {
+  return {
+    name: place?.name ?? '',
+    category: place?.category ?? 'sightseeing',
+    ...coordinateFields(place ?? coordinates),
+    memo: place?.memo ?? '',
   };
 }
 
@@ -41,7 +54,7 @@ export function coordinateInput(fields: CoordinateFields): Coordinates {
   };
 }
 
-export function validatePlaceInput(input: PlaceInput, mode: 'create' | 'edit') {
+export function validatePlaceInput(input: PlaceInput, mode: EditorMode) {
   const schema = mode === 'create' ? CreatePlaceBody : UpdatePlaceBody;
   const result = schema.safeParse(input, { error: z.locales.ja().localeError });
   if (result.success) return result;
@@ -58,6 +71,19 @@ export function validatePlaceInput(input: PlaceInput, mode: 'create' | 'edit') {
   return { success: false as const, issues };
 }
 
+export const resolvePlaceDraft: Resolver<PlaceDraft, EditorMode, PlaceInput> = (draft, mode = 'create') => {
+  // 入力途中の座標は文字列で持ち、送信前に数値へ変換して生成スキーマで検証する。
+  const result = validatePlaceInput({ ...draft, ...coordinateInput(draft) }, mode);
+  if (result.success) return { values: result.data, errors: {} };
+
+  const errors: FormErrors<PlaceDraft> = {};
+  for (const name of Object.keys(draft) as (keyof PlaceDraft)[]) {
+    const issue = result.issues.find((issue) => issue.path[0] === name);
+    if (issue) errors[name] = { type: issue.code, message: issue.message };
+  }
+  return { values: {}, errors };
+};
+
 const fieldErrorsResponse = z.object({
   fieldErrors: z.object({
     name: z.string(),
@@ -67,8 +93,6 @@ const fieldErrorsResponse = z.object({
     memo: z.string(),
   }).partial(),
 });
-export type FieldErrors = z.infer<typeof fieldErrorsResponse>['fieldErrors'];
-
 export function parsePlaceError(body: unknown, cause: unknown = body) {
   const parsed = fieldErrorsResponse.safeParse(body);
   const fieldErrors = parsed.success ? parsed.data.fieldErrors : {};

@@ -1,6 +1,6 @@
 # レベル1のSPA実装例
 
-[Orval版](orval)と[Hey API版](hey-api)を用意しました。両版ともレベル0のReact、MUI、OpenLayers、TanStack Query、Zustand、Zodの構成を使い、検索・詳細・登録・更新・削除・URL共有に座標の下書きと項目別エラー表示を加えています。比較元は[レベル0の実装例](../level0/README.md)です。
+[Orval版](orval)と[Hey API版](hey-api)を用意しました。両版ともレベル0の構成を引き継ぎ、React Hook Formで拠点の下書きと項目別エラーを管理します。比較元は[レベル0の実装例](../level0/README.md)です。
 
 ## 起動
 
@@ -26,10 +26,10 @@ Hey API版は `examples/level1/hey-api` で同じコマンドを実行します�
 
 | ファイル | 読むポイント |
 | --- | --- |
-| [`App.tsx`](orval/src/App.tsx) | 地図とフォームが使う座標の下書きを保持。キャンセル時は下書きを破棄し、保存時は既存のAPIフックでデータを更新する。 |
-| [`PlaceMap.tsx`](orval/src/PlaceMap.tsx) | OpenLayersの `Translate` を黄色い編集用ピンだけに適用。ドラッグ終了時に経度・緯度をフォーム用に返す。 |
-| [`PlaceEditor.tsx`](orval/src/PlaceEditor.tsx) | 下書きを保持し、送信前とサーバー応答の項目別エラーを各入力欄に表示する。 |
-| [`places.ts`](orval/src/places.ts) | 座標欄の文字列を数値に変換し、生成したZodスキーマで座標とフォーム全体を検証する。APIエラー本文から `fieldErrors` と `message` を読み取る。 |
+| [`App.tsx`](orval/src/App.tsx) | `useForm` で下書きを管理し、編集を開くたびに `reset` で初期値を設定する。ドラッグ後の座標は `setValue` でフォームに反映する。 |
+| [`PlaceMap.tsx`](orval/src/PlaceMap.tsx) | `useWatch` で経度・緯度だけを購読する。OpenLayersの `Translate` は黄色い編集用ピンに適用する。 |
+| [`PlaceEditor.tsx`](orval/src/PlaceEditor.tsx) | `Controller` でMUIの入力欄をつなぎ、`handleSubmit` で保存する。APIの項目別エラーは `setError` で反映する。 |
+| [`places.ts`](orval/src/places.ts) | `resolvePlaceDraft` が座標の文字列を数値に変換し、生成Zodで検証した結果をReact Hook Formに返す。 |
 
 ## バリデーションを比較する
 
@@ -40,7 +40,7 @@ Hey API版は `examples/level1/hey-api` で同じコマンドを実行します�
 | 地図に表示する座標の検証 | `PlaceMapFields.pick` で経度と緯度のルールを取り出す。 | `zPlaceMapFields.pick` で同じ項目を取り出す。 |
 | APIが `400` を返したとき | 生成されたFetchクライアントが `Error` を投げ、本文は `error.info` に入る。 | 生成されたミューテーションオプションが `throwOnError: true` を指定し、本文がそのまま渡る。 |
 
-`PlaceEditor.tsx` の `submit` から `validatePlaceInput` を呼び、緯度 `100` などを送信前に検出します。名前とメモはOpenAPIに合わせてコードポイント数で長さを判定するため、生成スキーマがUTF-16の長さだけで超過と判定した場合は数え直します。コードを比較するときは、それぞれの `validatePlaceInput` を開いてください。[Orval版](orval/src/places.ts)・[Hey API版](hey-api/src/places.ts)
+両版とも、`handleSubmit` が呼ぶリゾルバーで `validatePlaceInput` を実行し、緯度 `100` などを送信前に検出します。名前とメモはOpenAPIに合わせてコードポイント数で長さを判定するため、生成スキーマがUTF-16の長さだけで超過と判定した場合は数え直します。[Orval版](orval/src/places.ts)・[Hey API版](hey-api/src/places.ts)
 
 サーバーからの項目別エラーは、各版の `getApiError` が `fieldErrors` を取り出して画面に渡します。[Orval版のAPIフック](orval/src/api/use-places.ts)・[Hey API版のAPIフック](hey-api/src/api/use-places.ts)
 
