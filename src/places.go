@@ -69,7 +69,7 @@ func (api placeAPI) GetPlace(w http.ResponseWriter, r *http.Request, id PlaceId)
 func (api placeAPI) CreatePlace(w http.ResponseWriter, r *http.Request) {
 	input, err := readPlaceInput(r)
 	if err != nil {
-		badRequest(w, invalidPlaceBody)
+		badRequest(w, invalidJSONBody)
 		return
 	}
 	place, err := scanPlace(api.db.QueryRowContext(r.Context(), `
@@ -88,7 +88,7 @@ func (api placeAPI) CreatePlace(w http.ResponseWriter, r *http.Request) {
 func (api placeAPI) UpdatePlace(w http.ResponseWriter, r *http.Request, id PlaceId) {
 	input, err := readPlaceInput(r)
 	if err != nil {
-		badRequest(w, invalidPlaceBody)
+		badRequest(w, invalidJSONBody)
 		return
 	}
 	place, err := scanPlace(api.db.QueryRowContext(r.Context(), `

@@ -55,19 +55,23 @@ func TestPlaceWriteValidation(t *testing.T) {
 		{http.MethodPut, "/api/places/1", http.StatusOK},
 	} {
 		t.Run(endpoint.method, func(t *testing.T) {
-			db, err := openDatabase(":memory:")
+			db, err := openDatabase(":memory:", testPassword)
 			if err != nil {
 				t.Fatal(err)
 			}
 			defer db.Close()
-			handler, err := newHandler(db, fstest.MapFS{})
+			handler, err := newHandler(db, fstest.MapFS{}, []string{testViteOrigin}, false)
 			if err != nil {
 				t.Fatal(err)
 			}
-			before := placeRequest(handler, http.MethodGet, "/api/places/1", "").Body.String()
+			cookie := loginForTest(t, handler, nil)
+			placeRequest := func(method, path, body string) *httptest.ResponseRecorder {
+				return apiRequest(handler, method, path, body, testViteOrigin, cookie)
+			}
+			before := placeRequest(http.MethodGet, "/api/places/1", "").Body.String()
 			for _, test := range cases {
 				t.Run(test.name, func(t *testing.T) {
-					response := placeRequest(handler, endpoint.method, endpoint.path, test.body)
+					response := placeRequest(endpoint.method, endpoint.path, test.body)
 					if response.Code != http.StatusBadRequest {
 						t.Fatalf("status = %d, want 400: %s", response.Code, response.Body)
 					}
@@ -99,12 +103,12 @@ func TestPlaceWriteValidation(t *testing.T) {
 			if err := db.QueryRow("SELECT COUNT(*) FROM places").Scan(&count); err != nil {
 				t.Fatal(err)
 			}
-			if after := placeRequest(handler, http.MethodGet, "/api/places/1", "").Body.String(); count != 3 || after != before {
+			if after := placeRequest(http.MethodGet, "/api/places/1", "").Body.String(); count != 3 || after != before {
 				t.Fatalf("invalid requests changed the data: count = %d, place = %s", count, after)
 			}
 
 			boundaryBody := `{"name":"拠点","category":"nature","longitude":180,"latitude":-85.051129,"memo":"","LATITUDE":100}`
-			response := placeRequest(handler, endpoint.method, endpoint.path, boundaryBody)
+			response := placeRequest(endpoint.method, endpoint.path, boundaryBody)
 			if response.Code != endpoint.success {
 				t.Fatalf("status = %d, want %d: %s", response.Code, endpoint.success, response.Body)
 			}
@@ -117,12 +121,4 @@ func TestPlaceWriteValidation(t *testing.T) {
 			}
 		})
 	}
-}
-
-func placeRequest(handler http.Handler, method, path, body string) *httptest.ResponseRecorder {
-	request := httptest.NewRequest(method, path, strings.NewReader(body))
-	request.Header.Set("Content-Type", "application/json")
-	response := httptest.NewRecorder()
-	handler.ServeHTTP(response, request)
-	return response
 }
