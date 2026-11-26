@@ -156,12 +156,12 @@ export function App() {
           <div className="panel-heading map-heading">
             <div>
               <Typography id="map-title" variant="h6" component="h2" sx={{ fontWeight: 700 }}>世界地図</Typography>
-              <Typography variant="body2" color="text.secondary">ピンを選ぶと詳細を表示します</Typography>
+              {!editor && <Typography variant="body2" color="text.secondary">ピンを選ぶと詳細を表示します</Typography>}
             </div>
             <Button variant="contained" startIcon={<AddRounded />} onClick={() => {
               setPicking(true);
               setNotice('');
-            }} disabled={picking}>場所を追加</Button>
+            }} disabled={picking || Boolean(editor)}>場所を追加</Button>
           </div>
           {picking && (
             <Alert severity="info" className="picking-alert" action={
@@ -171,7 +171,8 @@ export function App() {
               setEditor({ mode: 'create' });
             }}>座標を入力</Button></Alert>
           )}
-          <PlaceMap places={places} selectedId={selectedId} selectedPlace={selectedPlace} onSelect={select}
+          <PlaceMap places={places} selectedId={selectedId} selectedPlace={selectedPlace}
+            onSelect={(id) => { if (!editor) select(id); }}
             onPick={(coordinates) => { setPicking(false); setEditor({ mode: 'create', coordinates }); }} />
           <div className="map-footer">
             {categories.map((category) => <span key={category}>
@@ -184,7 +185,8 @@ export function App() {
 
         <div className="side-panel">
           {notice && <Alert severity="success" onClose={() => setNotice('')}>{notice}</Alert>}
-          <Paper component="section" variant="outlined" aria-labelledby="list-title">
+          {editor && <PlaceEditor editor={editor} onClose={() => setEditor(undefined)} onSave={save} />}
+          <Paper component="section" variant="outlined" aria-labelledby="list-title" hidden={Boolean(editor)}>
             <div className="panel-heading side-heading">
               <Typography id="list-title" variant="h6" component="h2" sx={{ fontWeight: 700 }}>場所を探す</Typography>
               {list.isSuccess && <Chip label={`${places.length} 件`} size="small" />}
@@ -216,7 +218,7 @@ export function App() {
               ))}
             </div>}
           </Paper>
-          <Paper component="section" variant="outlined" aria-labelledby="detail-title">
+          <Paper component="section" variant="outlined" aria-labelledby="detail-title" hidden={Boolean(editor)}>
             <div className="panel-heading side-heading">
               <Typography id="detail-title" variant="h6" component="h2" sx={{ fontWeight: 700 }}>場所の詳細</Typography>
               {selectedId !== undefined && <IconButton aria-label="詳細を閉じる" onClick={() => select(undefined)} size="small"><CloseRounded /></IconButton>}
@@ -233,7 +235,11 @@ export function App() {
                   </Typography>
                   <Typography className="place-memo" variant="body2">{detail.data.memo || 'メモはありません。'}</Typography>
                   <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
-                    <Button size="small" variant="outlined" onClick={() => setEditor({ mode: 'edit', place: detail.data })}>編集</Button>
+                    <Button size="small" variant="outlined" onClick={() => {
+                      setPicking(false);
+                      setNotice('');
+                      setEditor({ mode: 'edit', place: detail.data });
+                    }}>編集</Button>
                     <Button size="small" color="error" onClick={() => { setDeleteError(''); setToDelete(detail.data); }}>削除</Button>
                     <Button size="small" startIcon={<ContentCopyRounded />} onClick={copyLink}>URLをコピー</Button>
                   </Stack>
@@ -246,7 +252,6 @@ export function App() {
         </div>
       </main>
 
-      {editor && <PlaceEditor editor={editor} onClose={() => setEditor(undefined)} onSave={save} />}
       {toDelete && (
         <Dialog open onClose={deleting ? undefined : () => setToDelete(undefined)} aria-labelledby="delete-title">
           <DialogTitle id="delete-title">場所を削除</DialogTitle>

@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { Alert, Button, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Stack, TextField } from '@mui/material';
+import { Alert, Button, MenuItem, Paper, Stack, TextField, Typography } from '@mui/material';
 import { categories, categoryLabels, errorMessage, placeInputSchema, type Coordinates, type Place, type PlaceInput } from './places';
 
 export type Editor = { mode: 'create'; coordinates?: Coordinates } | { mode: 'edit'; place: Place };
@@ -61,36 +61,37 @@ export function PlaceEditor({ editor, onClose, onSave }: Props) {
   }
 
   return (
-    <Dialog open onClose={saving ? undefined : onClose} fullWidth maxWidth="sm" aria-labelledby="editor-title">
-      <form onSubmit={submit} noValidate>
-        <DialogTitle id="editor-title">{place ? '場所を編集' : '場所を登録'}</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ pt: 1 }}>
-            {serverError && <Alert severity="error">{serverError}</Alert>}
-            <TextField label="名前" value={fields.name} onChange={(e) => change('name', e.target.value)}
-              error={Boolean(errors.name)} helperText={errors.name} required fullWidth autoFocus disabled={saving} />
-            <TextField label="カテゴリ" name="category" select value={fields.category}
-              onChange={(e) => change('category', e.target.value as PlaceInput['category'])}
-              error={Boolean(errors.category)} helperText={errors.category} fullWidth disabled={saving}>
-              {categories.map((category) => <MenuItem key={category} value={category}>{categoryLabels[category]}</MenuItem>)}
-            </TextField>
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-              <TextField label="経度" value={fields.longitude} onChange={(e) => change('longitude', e.target.value)}
-                error={Boolean(errors.longitude)} helperText={errors.longitude} fullWidth required disabled={saving}
-                slotProps={{ htmlInput: { inputMode: 'decimal' } }} />
-              <TextField label="緯度" value={fields.latitude} onChange={(e) => change('latitude', e.target.value)}
-                error={Boolean(errors.latitude)} helperText={errors.latitude} fullWidth required disabled={saving}
-                slotProps={{ htmlInput: { inputMode: 'decimal' } }} />
-            </Stack>
-            <TextField label="メモ" value={fields.memo} onChange={(e) => change('memo', e.target.value)}
-              error={Boolean(errors.memo)} helperText={errors.memo} fullWidth multiline minRows={3} disabled={saving} />
-          </Stack>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={onClose} disabled={saving}>キャンセル</Button>
+    <Paper component="section" variant="outlined" aria-labelledby="editor-title">
+      <Stack component="form" onSubmit={submit} noValidate spacing={2} sx={{ p: 2 }}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape' && !saving) onClose();
+        }}>
+        <Typography id="editor-title" variant="h6" component="h2" sx={{ fontWeight: 700 }}>
+          {place ? '場所を編集' : '場所を登録'}
+        </Typography>
+        {serverError && <Alert severity="error">{serverError}</Alert>}
+        <TextField label="名前" value={fields.name} onChange={(e) => change('name', e.target.value)}
+          error={Boolean(errors.name)} helperText={errors.name} required fullWidth autoFocus disabled={saving} />
+        <TextField label="カテゴリ" name="category" select value={fields.category}
+          onChange={(e) => change('category', e.target.value as PlaceInput['category'])}
+          error={Boolean(errors.category)} helperText={errors.category} fullWidth disabled={saving}>
+          {categories.map((category) => <MenuItem key={category} value={category}>{categoryLabels[category]}</MenuItem>)}
+        </TextField>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+          <TextField label="経度" value={fields.longitude} onChange={(e) => change('longitude', e.target.value)}
+            error={Boolean(errors.longitude)} helperText={errors.longitude} fullWidth required disabled={saving}
+            slotProps={{ htmlInput: { inputMode: 'decimal' } }} />
+          <TextField label="緯度" value={fields.latitude} onChange={(e) => change('latitude', e.target.value)}
+            error={Boolean(errors.latitude)} helperText={errors.latitude} fullWidth required disabled={saving}
+            slotProps={{ htmlInput: { inputMode: 'decimal' } }} />
+        </Stack>
+        <TextField label="メモ" value={fields.memo} onChange={(e) => change('memo', e.target.value)}
+          error={Boolean(errors.memo)} helperText={errors.memo} fullWidth multiline minRows={3} disabled={saving} />
+        <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>
+          <Button type="button" onClick={onClose} disabled={saving}>キャンセル</Button>
           <Button type="submit" variant="contained" disabled={saving}>{saving ? '保存中…' : '保存'}</Button>
-        </DialogActions>
-      </form>
-    </Dialog>
+        </Stack>
+      </Stack>
+    </Paper>
   );
 }
