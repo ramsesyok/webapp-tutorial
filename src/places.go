@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"strings"
@@ -68,7 +69,7 @@ func (api placeAPI) GetPlace(w http.ResponseWriter, r *http.Request, id PlaceId)
 func (api placeAPI) CreatePlace(w http.ResponseWriter, r *http.Request) {
 	input, err := readPlaceInput(r)
 	if err != nil {
-		badRequest(w, err.Error())
+		badRequest(w, invalidPlaceBody)
 		return
 	}
 	place, err := scanPlace(api.db.QueryRowContext(r.Context(), `
@@ -87,7 +88,7 @@ func (api placeAPI) CreatePlace(w http.ResponseWriter, r *http.Request) {
 func (api placeAPI) UpdatePlace(w http.ResponseWriter, r *http.Request, id PlaceId) {
 	input, err := readPlaceInput(r)
 	if err != nil {
-		badRequest(w, err.Error())
+		badRequest(w, invalidPlaceBody)
 		return
 	}
 	place, err := scanPlace(api.db.QueryRowContext(r.Context(), `
@@ -121,13 +122,26 @@ func (api placeAPI) DeletePlace(w http.ResponseWriter, r *http.Request, id Place
 }
 
 func readPlaceInput(r *http.Request) (PlaceInput, error) {
-	var input PlaceInput
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
 		return PlaceInput{}, err
 	}
-	// Go's regexp \s does not cover Unicode spaces such as U+3000.
-	if strings.TrimSpace(input.Name) == "" {
-		return PlaceInput{}, errors.New("場所の名前を入力してください。")
+	// Use the same case-sensitive property names as OpenAPI validation.
+	var values map[string]json.RawMessage
+	if err := json.Unmarshal(body, &values); err != nil {
+		return PlaceInput{}, err
+	}
+	var input PlaceInput
+	for name, destination := range map[string]any{
+		"name":      &input.Name,
+		"category":  &input.Category,
+		"longitude": &input.Longitude,
+		"latitude":  &input.Latitude,
+		"memo":      &input.Memo,
+	} {
+		if err := json.Unmarshal(values[name], destination); err != nil {
+			return PlaceInput{}, err
+		}
 	}
 	return input, nil
 }

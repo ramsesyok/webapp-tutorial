@@ -19,6 +19,7 @@ import (
 	assets "github.com/ramsesyok/webapp-tutorial"
 
 	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/getkin/kin-openapi/openapi3filter"
 	middleware "github.com/oapi-codegen/nethttp-middleware"
 	"github.com/swaggest/swgui/v5emb"
 )
@@ -52,7 +53,7 @@ func main() {
 }
 
 func newHandler(db *sql.DB, dist fs.FS) (http.Handler, error) {
-	spec, err := openapi3.NewLoader().LoadFromData(assets.OpenAPI)
+	spec, err := openapi3.NewLoader().LoadFromData(assets.OpenAPILevel1)
 	if err != nil {
 		return nil, fmt.Errorf("load OpenAPI: %w", err)
 	}
@@ -61,9 +62,8 @@ func newHandler(db *sql.DB, dist fs.FS) (http.Handler, error) {
 	}
 	validate := middleware.OapiRequestValidatorWithOptions(spec, &middleware.Options{
 		SilenceServersWarning: true, // The spec uses the relative server URL /api.
-		ErrorHandler: func(w http.ResponseWriter, message string, _ int) {
-			badRequest(w, message)
-		},
+		Options:               openapi3filter.Options{MultiError: true},
+		ErrorHandlerWithOpts:  writeValidationError,
 	})
 	apiRoutes := HandlerWithOptions(placeAPI{db: db}, StdHTTPServerOptions{
 		BaseURL:     "/api",
@@ -83,7 +83,7 @@ func newHandler(db *sql.DB, dist fs.FS) (http.Handler, error) {
 	})
 	mux.HandleFunc("GET /swagger/openapi.yaml", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/yaml")
-		http.ServeContent(w, r, "openapi.yaml", time.Time{}, bytes.NewReader(assets.OpenAPI))
+		http.ServeContent(w, r, "openapi.yaml", time.Time{}, bytes.NewReader(assets.OpenAPILevel1))
 	})
 	mux.Handle("GET /swagger/", v5emb.New(spec.Info.Title, "/swagger/openapi.yaml", "/swagger/"))
 	mux.Handle("/", spaHandler(dist))

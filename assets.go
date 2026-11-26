@@ -8,3 +8,6 @@ var WorldMap []byte
 
 //go:embed schema/openapi.yaml
 var OpenAPI []byte
+
+//go:embed schema/level1/openapi.yaml
+var OpenAPILevel1 []byte

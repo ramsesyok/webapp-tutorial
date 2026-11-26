@@ -1,0 +1,175 @@
+:root {
+  --border: #d9e4dd;
+  --muted: #52665e;
+}
+
+.app-header {
+  background: #12372e;
+  color: #fff;
+  padding: 20px max(24px, calc((100vw - 1520px) / 2));
+}
+
+.heading {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.brand-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  color: #c8efdc;
+  background: #285548;
+}
+
+.workspace {
+  display: grid;
+  align-items: start;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 390px);
+  gap: 20px;
+  max-width: 1568px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.map-panel, .side-panel > section {
+  border-color: var(--border) !important;
+  overflow: hidden;
+}
+
+.panel-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 18px;
+  gap: 12px;
+}
+
+.map-heading {
+  border-bottom: 1px solid var(--border);
+}
+
+.map-heading button {
+  flex-shrink: 0;
+}
+
+.map-shell {
+  position: relative;
+  background: #d5e9e9;
+}
+
+.map-target {
+  height: clamp(400px, calc(100vh - 235px), 740px);
+  min-width: 0;
+}
+
+.map-target .ol-zoom {
+  top: 12px;
+  left: 12px;
+}
+
+.is-picking .ol-viewport {
+  cursor: crosshair;
+}
+
+.picking-alert {
+  border-radius: 0 !important;
+}
+
+.map-warning {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  max-width: calc(100% - 65px);
+}
+
+.map-footer, .list-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--border);
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.map-credit {
+  margin-left: auto;
+  font-size: 0.72rem;
+}
+
+.category-dot {
+  display: inline-block;
+  margin-right: 5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.side-panel {
+  display: grid;
+  min-width: 0;
+  gap: 16px;
+}
+
+.search-form {
+  display: grid;
+  gap: 10px;
+  padding: 0 18px 16px;
+}
+
+.search-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.place-list {
+  border-top: 1px solid var(--border);
+  max-height: 285px;
+  overflow-y: auto;
+}
+
+.place-list .MuiListItemText-root {
+  margin-right: 8px;
+  overflow-wrap: anywhere;
+}
+
+.place-list .Mui-selected {
+  border-left: 3px solid #176857;
+  padding-left: 13px;
+}
+
+.list-message, .detail-content {
+  padding: 0 18px 16px;
+}
+
+.place-memo {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 850px) {
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+  .map-target {
+    height: max(340px, 52vh);
+  }
+}
+
+@media (max-width: 480px) {
+  .app-header {
+    padding: 15px 12px;
+  }
+  .workspace {
+    padding: 12px;
+  }
+  .panel-heading {
+    padding: 12px;
+  }
+}

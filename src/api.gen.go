@@ -30,8 +30,13 @@ type Category string
 
 // Error defines model for Error.
 type Error struct {
-	Code    ErrorCode `json:"code"`
-	Message string    `json:"message"`
+	Code ErrorCode `json:"code"`
+
+	// FieldErrors 登録・更新の入力欄ごとのエラーです。キーはリクエストの項目名
+	// （name、category、longitude、latitude、memo）、値はその欄に表示する理由です。
+	// JSONの形式やパスなど、入力欄に対応しないエラーだけの場合は省略します。
+	FieldErrors *map[string]string `json:"fieldErrors,omitempty"`
+	Message     string             `json:"message"`
 }
 
 // ErrorCode defines model for Error.Code.
@@ -55,7 +60,7 @@ type Place struct {
 	// Memo 場所のメモ。メモがない場合は空文字を指定します。
 	Memo Memo `json:"memo"`
 
-	// Name 場所の名前。空白のみの値は400になります。
+	// Name 場所の名前。Unicodeの空白文字のみの値は400になります。
 	Name string `json:"name"`
 }
 
@@ -76,7 +81,7 @@ type PlaceInput struct {
 	// Memo 場所のメモ。メモがない場合は空文字を指定します。
 	Memo Memo `json:"memo"`
 
-	// Name 場所の名前。空白のみの値は400になります。
+	// Name 場所の名前。Unicodeの空白文字のみの値は400になります。
 	Name string `json:"name"`
 }
 
@@ -91,7 +96,7 @@ type PlaceMapFields struct {
 	// Longitude 経度（度）。
 	Longitude float64 `json:"longitude"`
 
-	// Name 場所の名前。空白のみの値は400になります。
+	// Name 場所の名前。Unicodeの空白文字のみの値は400になります。
 	Name string `json:"name"`
 }
 
@@ -107,12 +112,15 @@ type PlaceSummary struct {
 	// Longitude 経度（度）。
 	Longitude float64 `json:"longitude"`
 
-	// Name 場所の名前。空白のみの値は400になります。
+	// Name 場所の名前。Unicodeの空白文字のみの値は400になります。
 	Name string `json:"name"`
 }
 
 // BadRequest defines model for BadRequest.
 type BadRequest = Error
+
+// InvalidPlaceInput defines model for InvalidPlaceInput.
+type InvalidPlaceInput = Error
 
 // NotFound defines model for NotFound.
 type NotFound = Error
