@@ -70,7 +70,7 @@ OpenLayersの `Draw` で単一の多角形を描き、`Modify` で頂点を追�
 
 ## レベルごとのバックエンド改修プラン（講師向け）
 
-**レベルNにはメジャー番号Nの実行ファイルを配布する。** 以下は各版で初めて必要になる差分で、レベル3以降のバックエンドは計画段階である。レベル0はリリース `v0.1.0` とその[OpenAPI定義](schema/openapi.yaml)を基準にする。レベル1とレベル2のバックエンドは、それぞれ[レベル1のOpenAPI定義](schema/level1/openapi.yaml)と[レベル2のOpenAPI定義](schema/level2/openapi.yaml)をコード生成とSwagger UIに使う。ここでいう版番号はGitHubの配布タグを指す。
+**レベルNにはメジャー番号Nの実行ファイルを配布する。** 以下は各版で初めて必要になる差分で、レベル4以降のバックエンドは計画段階である。レベル0はリリース `v0.1.0` とその[OpenAPI定義](schema/openapi.yaml)を基準にする。レベル1〜3のバックエンドは、それぞれ[レベル1](schema/level1/openapi.yaml)、[レベル2](schema/level2/openapi.yaml)、[レベル3](schema/level3/openapi.yaml)のOpenAPI定義をコード生成とSwagger UIに使う。ここでいう版番号はGitHubの配布タグを指す。
 
 各ZIPには該当タグから作った実行ファイル、README、`schema/openapi.yaml` を同梱する。各版のOpenAPIからGoコードを生成し、Swagger UIにもその版の定義を載せる。先の課題専用のAPI・テーブルは、その課題を導入する版で追加する。実行ファイルは版別のフォルダで起動し、各レベルの初期データでSQLiteを作成する。以下のAPI例は共通の接頭辞 `/api` を省略している。
 

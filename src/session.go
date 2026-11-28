@@ -72,10 +72,10 @@ func (api sessionAPI) authenticate(ctx context.Context, input *openapi3filter.Au
 	}
 	session := ctx.Value(sessionContextKey{}).(*authenticatedSession)
 	err := api.db.QueryRowContext(ctx, `
-		SELECT users.id, users.login_id
+		SELECT users.id, users.login_id, users.role, users.active
 		FROM sessions JOIN users ON users.id = sessions.user_id
-		WHERE sessions.token_hash = ? AND sessions.expires_at > ?
-	`, tokenHash[:], time.Now().Unix()).Scan(&session.user.Id, &session.user.LoginId)
+		WHERE sessions.token_hash = ? AND sessions.expires_at > ? AND users.active = 1
+	`, tokenHash[:], time.Now().Unix()).Scan(&session.user.Id, &session.user.LoginId, &session.user.Role, &session.user.Active)
 	if errors.Is(err, sql.ErrNoRows) {
 		return errUnauthenticated
 	}
@@ -94,8 +94,8 @@ func (api sessionAPI) CreateSession(w http.ResponseWriter, r *http.Request) {
 	salt := make([]byte, passwordSaltBytes)
 	storedHash := make([]byte, sha256.Size)
 	err := api.db.QueryRowContext(ctx, `
-		SELECT id, login_id, password_salt, password_hash FROM users WHERE login_id = ?
-	`, input.LoginId).Scan(&user.Id, &user.LoginId, &salt, &storedHash)
+		SELECT id, login_id, role, active, password_salt, password_hash FROM users WHERE login_id = ?
+	`, input.LoginId).Scan(&user.Id, &user.LoginId, &user.Role, &user.Active, &salt, &storedHash)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		databaseError(w, err)
 		return
@@ -106,20 +106,28 @@ func (api sessionAPI) CreateSession(w http.ResponseWriter, r *http.Request) {
 		databaseError(w, hashErr)
 		return
 	}
-	if subtle.ConstantTimeCompare(hash, storedHash) != 1 || user.Id == 0 {
-		writeJSON(w, http.StatusUnauthorized, Error{
-			Code:    INVALIDCREDENTIALS,
-			Message: "ログインIDまたはパスワードが正しくありません。",
-		})
+	if subtle.ConstantTimeCompare(hash, storedHash) != 1 || !user.Active {
+		invalidCredentials(w)
 		return
 	}
 	token, err := api.startSession(r, user.Id)
+	if errors.Is(err, errUnauthenticated) {
+		invalidCredentials(w)
+		return
+	}
 	if err != nil {
 		databaseError(w, err)
 		return
 	}
 	http.SetCookie(w, api.sessionCookie(token, int(sessionLifetime/time.Second)))
 	writeJSON(w, http.StatusOK, user)
+}
+
+func invalidCredentials(w http.ResponseWriter) {
+	writeJSON(w, http.StatusUnauthorized, Error{
+		Code:    INVALIDCREDENTIALS,
+		Message: "ログインIDまたはパスワードが正しくありません。",
+	})
 }
 
 func (api sessionAPI) startSession(r *http.Request, userID int64) (string, error) {
@@ -142,10 +150,18 @@ func (api sessionAPI) startSession(r *http.Request, userID int64) (string, error
 	}
 	token := randomToken(sessionTokenBytes)
 	tokenHash := sha256.Sum256([]byte(token))
-	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)
-	`, tokenHash[:], userID, now.Add(sessionLifetime).Unix()); err != nil {
+	// パスワードの照合中に無効化されたアカウントにはセッションを発行しない。
+	result, err := tx.ExecContext(ctx, `
+		INSERT INTO sessions (token_hash, user_id, expires_at)
+		SELECT ?, id, ? FROM users WHERE id = ? AND active = 1
+	`, tokenHash[:], now.Add(sessionLifetime).Unix(), userID)
+	if err != nil {
 		return "", err
+	}
+	if inserted, err := result.RowsAffected(); err != nil {
+		return "", err
+	} else if inserted == 0 {
+		return "", errUnauthenticated
 	}
 	if err := tx.Commit(); err != nil {
 		return "", err
@@ -154,12 +170,12 @@ func (api sessionAPI) startSession(r *http.Request, userID int64) (string, error
 }
 
 func (api sessionAPI) GetSession(w http.ResponseWriter, r *http.Request) {
-	session := r.Context().Value(sessionContextKey{}).(*authenticatedSession)
+	session := requestSession(r)
 	writeJSON(w, http.StatusOK, session.user)
 }
 
 func (api sessionAPI) DeleteSession(w http.ResponseWriter, r *http.Request) {
-	session := r.Context().Value(sessionContextKey{}).(*authenticatedSession)
+	session := requestSession(r)
 	if _, err := api.db.ExecContext(r.Context(), "DELETE FROM sessions WHERE token_hash = ?", session.tokenHash[:]); err != nil {
 		databaseError(w, err)
 		return
@@ -188,13 +204,15 @@ func readSessionTokenHash(r *http.Request) ([sha256.Size]byte, bool) {
 	return sha256.Sum256([]byte(cookie.Value)), true
 }
 
+func requestSession(r *http.Request) *authenticatedSession {
+	return r.Context().Value(sessionContextKey{}).(*authenticatedSession)
+}
+
 func insertInitialUser(ctx context.Context, tx *sql.Tx, password string) error {
 	if !utf8.ValidString(password) || utf8.RuneCountInString(password) > maxPasswordChars {
 		return errors.New("TUTORIAL_INITIAL_PASSWORD must be valid UTF-8 and at most 128 characters")
 	}
-	salt := make([]byte, passwordSaltBytes)
-	rand.Read(salt)
-	hash, err := hashPassword(password, salt)
+	salt, hash, err := newPasswordHash(password)
 	if err != nil {
 		return err
 	}
@@ -202,6 +220,13 @@ func insertInitialUser(ctx context.Context, tx *sql.Tx, password string) error {
 		INSERT INTO users (login_id, password_salt, password_hash) VALUES (?, ?, ?)
 	`, initialLoginID, salt, hash)
 	return err
+}
+
+func newPasswordHash(password string) ([]byte, []byte, error) {
+	salt := make([]byte, passwordSaltBytes)
+	rand.Read(salt)
+	hash, err := hashPassword(password, salt)
+	return salt, hash, err
 }
 
 func hashPassword(password string, salt []byte) ([]byte, error) {

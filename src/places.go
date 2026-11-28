@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -15,6 +16,24 @@ type placeAPI struct {
 	db *sql.DB
 }
 
+type placeReader interface {
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+}
+
+func readAccessiblePlace(r *http.Request, db placeReader, id PlaceId) (Place, error) {
+	place, err := scanPlace(db.QueryRowContext(r.Context(), `
+		SELECT id, name, category, longitude, latitude, memo, assignee_id FROM places WHERE id = ?
+	`, id))
+	if err != nil {
+		return Place{}, err
+	}
+	user := requestSession(r).user
+	if user.Role != Admin && (place.AssigneeId == nil || *place.AssigneeId != user.Id) {
+		return Place{}, errForbidden
+	}
+	return place, nil
+}
+
 func (api placeAPI) ListPlaces(w http.ResponseWriter, r *http.Request, params ListPlacesParams) {
 	var keyword string
 	if params.Q != nil {
@@ -25,14 +44,16 @@ func (api placeAPI) ListPlaces(w http.ResponseWriter, r *http.Request, params Li
 		category = *params.Category
 	}
 
+	user := requestSession(r).user
 	// SQLite lower() folds ASCII, and instr() treats characters such as % literally.
 	rows, err := api.db.QueryContext(r.Context(), `
-		SELECT id, name, category, longitude, latitude
+		SELECT id, name, category, longitude, latitude, assignee_id
 		FROM places
 		WHERE (? = '' OR instr(lower(name), lower(?)) > 0 OR instr(lower(memo), lower(?)) > 0)
 		  AND (? = '' OR category = ?)
+		  AND (? OR assignee_id = ?)
 		ORDER BY id
-	`, keyword, keyword, keyword, category, category)
+	`, keyword, keyword, keyword, category, category, user.Role == Admin, user.Id)
 	if err != nil {
 		databaseError(w, err)
 		return
@@ -42,7 +63,7 @@ func (api placeAPI) ListPlaces(w http.ResponseWriter, r *http.Request, params Li
 	places := []PlaceSummary{}
 	for rows.Next() {
 		var place PlaceSummary
-		if err := rows.Scan(&place.Id, &place.Name, &place.Category, &place.Longitude, &place.Latitude); err != nil {
+		if err := rows.Scan(&place.Id, &place.Name, &place.Category, &place.Longitude, &place.Latitude, &place.AssigneeId); err != nil {
 			databaseError(w, err)
 			return
 		}
@@ -56,9 +77,7 @@ func (api placeAPI) ListPlaces(w http.ResponseWriter, r *http.Request, params Li
 }
 
 func (api placeAPI) GetPlace(w http.ResponseWriter, r *http.Request, id PlaceId) {
-	place, err := scanPlace(api.db.QueryRowContext(r.Context(), `
-		SELECT id, name, category, longitude, latitude, memo FROM places WHERE id = ?
-	`, id))
+	place, err := readAccessiblePlace(r, api.db, id)
 	if err != nil {
 		databaseError(w, err)
 		return
@@ -67,6 +86,9 @@ func (api placeAPI) GetPlace(w http.ResponseWriter, r *http.Request, id PlaceId)
 }
 
 func (api placeAPI) CreatePlace(w http.ResponseWriter, r *http.Request) {
+	if !requireAdmin(w, r) {
+		return
+	}
 	input, err := readPlaceInput(r)
 	if err != nil {
 		badRequest(w, invalidJSONBody)
@@ -75,7 +97,7 @@ func (api placeAPI) CreatePlace(w http.ResponseWriter, r *http.Request) {
 	place, err := scanPlace(api.db.QueryRowContext(r.Context(), `
 		INSERT INTO places (name, category, longitude, latitude, memo)
 		VALUES (?, ?, ?, ?, ?)
-		RETURNING id, name, category, longitude, latitude, memo
+		RETURNING id, name, category, longitude, latitude, memo, assignee_id
 	`, input.Name, input.Category, input.Longitude, input.Latitude, input.Memo))
 	if err != nil {
 		databaseError(w, err)
@@ -91,12 +113,42 @@ func (api placeAPI) UpdatePlace(w http.ResponseWriter, r *http.Request, id Place
 		badRequest(w, invalidJSONBody)
 		return
 	}
-	place, err := scanPlace(api.db.QueryRowContext(r.Context(), `
+	ctx := r.Context()
+	tx, err := api.db.BeginTx(ctx, nil)
+	if err != nil {
+		databaseError(w, err)
+		return
+	}
+	defer tx.Rollback()
+
+	// 担当の確認から更新の確定まで、別のリクエストが担当を変更できないようにする。
+	if _, err := readAccessiblePlace(r, tx, id); err != nil {
+		databaseError(w, err)
+		return
+	}
+	user := requestSession(r).user
+	if user.Role == Assignee {
+		var active bool
+		if err := tx.QueryRowContext(ctx, "SELECT active FROM users WHERE id = ?", user.Id).Scan(&active); err != nil {
+			databaseError(w, err)
+			return
+		}
+		if !active {
+			unauthenticated(w)
+			return
+		}
+	}
+
+	place, err := scanPlace(tx.QueryRowContext(ctx, `
 		UPDATE places SET name = ?, category = ?, longitude = ?, latitude = ?, memo = ?
 		WHERE id = ?
-		RETURNING id, name, category, longitude, latitude, memo
+		RETURNING id, name, category, longitude, latitude, memo, assignee_id
 	`, input.Name, input.Category, input.Longitude, input.Latitude, input.Memo, id))
 	if err != nil {
+		databaseError(w, err)
+		return
+	}
+	if err := tx.Commit(); err != nil {
 		databaseError(w, err)
 		return
 	}
@@ -104,6 +156,9 @@ func (api placeAPI) UpdatePlace(w http.ResponseWriter, r *http.Request, id Place
 }
 
 func (api placeAPI) DeletePlace(w http.ResponseWriter, r *http.Request, id PlaceId) {
+	if !requireAdmin(w, r) {
+		return
+	}
 	result, err := api.db.ExecContext(r.Context(), "DELETE FROM places WHERE id = ?", id)
 	if err != nil {
 		databaseError(w, err)
@@ -159,6 +214,10 @@ func badRequest(w http.ResponseWriter, message string) {
 }
 
 func databaseError(w http.ResponseWriter, err error) {
+	if errors.Is(err, errForbidden) {
+		forbidden(w)
+		return
+	}
 	if errors.Is(err, sql.ErrNoRows) {
 		writeJSON(w, http.StatusNotFound, Error{Code: PLACENOTFOUND, Message: "指定した場所が見つかりません。"})
 		return

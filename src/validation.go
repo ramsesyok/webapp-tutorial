@@ -25,10 +25,7 @@ func writeValidationError(_ context.Context, err error, w http.ResponseWriter, _
 			databaseError(w, err)
 			return
 		}
-		writeJSON(w, http.StatusUnauthorized, Error{
-			Code:    UNAUTHENTICATED,
-			Message: "ログインしてください。",
-		})
+		unauthenticated(w)
 		return
 	}
 	requestError, ok := err.(*openapi3filter.RequestError)
@@ -49,6 +46,10 @@ func writeValidationError(_ context.Context, err error, w http.ResponseWriter, _
 		Message:     "入力内容を確認してください。",
 		FieldErrors: &fields,
 	})
+}
+
+func unauthenticated(w http.ResponseWriter) {
+	writeJSON(w, http.StatusUnauthorized, Error{Code: UNAUTHENTICATED, Message: "ログインしてください。"})
 }
 
 func collectFieldErrors(err error, fields map[string]string) {
@@ -77,6 +78,9 @@ func fieldErrorReason(err *openapi3.SchemaError) string {
 	case "required", "nullable", "minLength":
 		return "必須項目です。"
 	case "pattern":
+		if path := err.JSONPointer(); len(path) == 1 && path[0] == "loginId" {
+			return "半角英数字、ピリオド、アンダースコア、ハイフンのみ使用できます。"
+		}
 		return "空白以外の文字を入力してください。"
 	case "maxLength":
 		return fmt.Sprintf("%d文字以内で入力してください。", *err.Schema.MaxLength)
@@ -85,7 +89,7 @@ func fieldErrorReason(err *openapi3.SchemaError) string {
 	case "enum":
 		return "一覧にあるカテゴリを選んでください。"
 	case "type":
-		if err.Schema.Type.Is(openapi3.TypeNumber) {
+		if err.Schema.Type.Is(openapi3.TypeNumber) || err.Schema.Type.Is(openapi3.TypeInteger) {
 			return "数値を入力してください。"
 		}
 		return "文字列を入力してください。"

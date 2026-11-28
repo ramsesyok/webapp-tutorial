@@ -14,3 +14,6 @@ var OpenAPILevel1 []byte
 
 //go:embed schema/level2/openapi.yaml
 var OpenAPILevel2 []byte
+
+//go:embed schema/level3/openapi.yaml
+var OpenAPILevel3 []byte
