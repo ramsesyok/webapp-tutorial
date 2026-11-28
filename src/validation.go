@@ -61,7 +61,12 @@ func collectFieldErrors(err error, fields map[string]string) {
 			}
 			return
 		case *openapi3.SchemaError:
-			if path := validationError.JSONPointer(); len(path) == 1 {
+			path := validationError.JSONPointer()
+			if len(path) > 0 && path[0] == "geometry" {
+				fields["geometry"] = "外周1本の多角形を経度・緯度の座標で指定してください。"
+				return
+			}
+			if len(path) == 1 {
 				if _, exists := fields[path[0]]; !exists {
 					fields[path[0]] = fieldErrorReason(validationError)
 				}

@@ -1,0 +1,847 @@
+openapi: 3.0.3
+info:
+  title: 訪問拠点 API（学習レベル4）
+  version: 4.0.0
+  description: 訪問拠点と担当エリアを管理し、多角形の編集競合を扱う教材用APIです。
+servers:
+  - url: /api
+security:
+  - sessionCookie: []
+
+paths:
+  /session:
+    post:
+      operationId: createSession
+      summary: ログインする
+      description: 配布されたログインIDとパスワードを送信すると、ブラウザーにセッションCookieが設定されます。
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginInput'
+      responses:
+        '200':
+          description: ログインしたユーザー。
+          headers:
+            Set-Cookie:
+              description: ブラウザーに設定する HttpOnly・SameSite=Lax のセッションCookie。
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          description: 認証情報が正しくないか、ユーザーが無効です。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: INVALID_CREDENTIALS
+                message: ログインIDまたはパスワードが正しくありません。
+        '403':
+          $ref: '#/components/responses/InvalidOrigin'
+    get:
+      operationId: getSession
+      summary: ログイン中のユーザーを取得する
+      responses:
+        '200':
+          description: ログイン中のユーザー。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    delete:
+      operationId: deleteSession
+      summary: ログアウトする
+      responses:
+        '204':
+          description: セッションを失効しました。レスポンスボディはありません。
+          headers:
+            Set-Cookie:
+              description: ブラウザーのセッションCookieを削除します。
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/InvalidOrigin'
+  /users:
+    get:
+      operationId: listUsers
+      summary: ユーザーの一覧を取得する
+      description: 管理者のみ。無効なユーザーも含め、IDの昇順で返します。
+      responses:
+        '200':
+          description: ユーザー一覧。
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      operationId: createUser
+      summary: 担当者アカウントを作成する
+      description: 管理者のみ。有効な担当者アカウントを作成します。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserInput'
+      responses:
+        '201':
+          description: 作成した担当者。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/WriteForbidden'
+        '409':
+          description: ログインIDは登録済みです。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: LOGIN_ID_TAKEN
+                message: このログインIDはすでに使われています。
+  /users/{userId}/disabled:
+    put:
+      operationId: disableUser
+      summary: 担当者アカウントを無効にする
+      description: 管理者のみ。担当者のセッションも失効します。現在の担当割り当ては保持され、管理者が変更できます。
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/UserId'
+      responses:
+        '204':
+          description: 担当者は無効です。
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/WriteForbidden'
+        '404':
+          description: 指定したユーザーが見つかりません。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: USER_NOT_FOUND
+                message: 指定したユーザーが見つかりません。
+  /places:
+    get:
+      operationId: listPlaces
+      summary: 場所の一覧を取得・検索する
+      description: |
+        指定された検索条件をすべて満たす場所を、IDの昇順で返します。
+        管理者は全拠点、担当者は自分が担当する拠点を検索できます。メモを表示・編集するときは詳細を取得してください。
+      parameters:
+        - name: q
+          in: query
+          description: |
+            名前またはメモの部分一致です。検索語の前後の空白を取り除き、
+            英字の大文字と小文字を区別しません。空文字や空白のみの場合はキーワードによる絞り込みを行いません。
+          schema:
+            type: string
+            maxLength: 100
+          example: ベルリン
+        - name: category
+          in: query
+          description: カテゴリの完全一致。すべてのカテゴリを対象にする場合は、このパラメータを省略します。
+          schema:
+            $ref: '#/components/schemas/Category'
+      responses:
+        '200':
+          description: 検索結果。該当する場所がなければ空配列を返します。
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PlaceSummary'
+              examples:
+                matches:
+                  summary: 1件見つかった場合
+                  value:
+                    - id: 1
+                      name: ブランデンブルク門
+                      category: sightseeing
+                      longitude: 13.3777
+                      latitude: 52.5163
+                      assigneeId: null
+                empty:
+                  summary: 該当する場所がない場合
+                  value: []
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      operationId: createPlace
+      summary: 場所を登録する
+      description: 管理者のみ。新しい拠点は未割り当てです。
+      requestBody:
+        $ref: '#/components/requestBodies/PlaceInput'
+      responses:
+        '201':
+          description: 登録した場所。
+          headers:
+            Location:
+              description: 登録した場所の取得先。
+              schema:
+                type: string
+              example: /api/places/1
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Place'
+        '400':
+          $ref: '#/components/responses/InvalidPlaceInput'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/WriteForbidden'
+  /places/{placeId}:
+    parameters:
+      - name: placeId
+        in: path
+        required: true
+        description: サーバーが発行した場所のID。
+        schema:
+          $ref: '#/components/schemas/PlaceId'
+    get:
+      operationId: getPlace
+      summary: 場所を1件取得する
+      description: 管理者と、この拠点を担当するユーザーが取得できます。
+      responses:
+        '200':
+          description: 指定した場所。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Place'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      operationId: updatePlace
+      summary: 場所の登録内容を更新する
+      description: 管理者と、この拠点を担当するユーザーが登録内容を更新できます。担当者の変更には担当割り当てAPIを使います。
+      requestBody:
+        $ref: '#/components/requestBodies/PlaceInput'
+      responses:
+        '200':
+          description: 更新後の場所。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Place'
+        '400':
+          $ref: '#/components/responses/InvalidPlaceInput'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/WriteForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      operationId: deletePlace
+      summary: 場所を削除する
+      description: 管理者のみ。
+      responses:
+        '204':
+          description: 削除しました。レスポンスボディはありません。
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/WriteForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /places/{placeId}/assignee:
+    put:
+      operationId: setPlaceAssignee
+      summary: 拠点の担当者を変更する
+      description: 管理者のみ。有効な担当者を指定するか、nullで割り当てを解除します。同じ担当者を指定した場合は変更履歴を追加しません。
+      parameters:
+        - name: placeId
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/PlaceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignmentInput'
+      responses:
+        '200':
+          description: 担当者割り当て後の拠点。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Place'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/WriteForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /places/{placeId}/assignment-history:
+    get:
+      operationId: listAssignmentHistory
+      summary: 拠点の担当変更履歴を取得する
+      description: 管理者と、この拠点を現在担当するユーザーが取得できます。最新の変更から返します。
+      parameters:
+        - name: placeId
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/PlaceId'
+      responses:
+        '200':
+          description: 担当変更履歴。履歴がなければ空配列を返します。
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AssignmentChange'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /areas:
+    get:
+      operationId: listAreas
+      summary: 担当エリアの一覧を取得する
+      description: 管理者には全エリア、担当者には自身の担当エリアをIDの昇順で返します。
+      responses:
+        '200':
+          description: 地図に表示する形状を含むエリア一覧。
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Area'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      operationId: createArea
+      summary: 担当エリアを登録する
+      description: 管理者が有効な担当者を指定して登録します。
+      requestBody:
+        $ref: '#/components/requestBodies/AreaInput'
+      responses:
+        '201':
+          description: 登録したエリアと初回の版。
+          headers:
+            ETag:
+              $ref: '#/components/headers/AreaETag'
+            Location:
+              description: 登録したエリアの詳細URL。
+              schema:
+                type: string
+                example: /api/areas/1
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Area'
+        '400':
+          $ref: '#/components/responses/InvalidAreaInput'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/WriteForbidden'
+  /areas/{areaId}:
+    parameters:
+      - name: areaId
+        in: path
+        required: true
+        description: 担当エリアのID。
+        schema:
+          $ref: '#/components/schemas/AreaId'
+    get:
+      operationId: getArea
+      summary: 担当エリアの詳細と版を取得する
+      responses:
+        '200':
+          $ref: '#/components/responses/AreaWithETag'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/AreaNotFound'
+    put:
+      operationId: updateArea
+      summary: 担当エリアを更新する
+      description: |
+        管理者はすべての項目を、担当者は自分の担当エリアの名前と形状を更新できます。
+        詳細取得時の ETag と現在の版が一致した場合に保存します。
+      parameters:
+        - name: If-Match
+          in: header
+          required: true
+          description: 詳細取得時の ETag を引用符も含めて指定します。タグ1個を受け付けます。
+          schema:
+            $ref: '#/components/schemas/AreaETag'
+          example: '"area-1-v1"'
+      requestBody:
+        $ref: '#/components/requestBodies/AreaInput'
+      responses:
+        '200':
+          $ref: '#/components/responses/AreaWithETag'
+        '400':
+          $ref: '#/components/responses/InvalidAreaInput'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/WriteForbidden'
+        '404':
+          $ref: '#/components/responses/AreaNotFound'
+        '412':
+          description: このエリアは取得後に更新されています。詳細を再取得してください。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: area_version_mismatch
+                message: 別の画面でこのエリアが更新されました。
+
+components:
+  headers:
+    AreaETag:
+      description: エリアのIDと版を含む強い ETag。
+      required: true
+      schema:
+        $ref: '#/components/schemas/AreaETag'
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: tutorial_session
+      description: >
+        POST /session でログインすると、同一オリジンへのリクエストにはブラウザーが自動的にCookieを送ります。
+        Swagger UIでも POST /session からログインしてください。
+  schemas:
+    LoginInput:
+      type: object
+      required: [loginId, password]
+      additionalProperties: false
+      properties:
+        loginId:
+          type: string
+          minLength: 1
+          maxLength: 64
+          example: student
+        password:
+          type: string
+          format: password
+          writeOnly: true
+          minLength: 1
+          maxLength: 128
+    UserId:
+      type: integer
+      format: int64
+      minimum: 1
+      maximum: 9007199254740991
+      example: 2
+    UserRole:
+      type: string
+      description: admin は管理者、assignee は担当者。
+      enum: [admin, assignee]
+    User:
+      type: object
+      required: [id, loginId, role, active]
+      properties:
+        id:
+          $ref: '#/components/schemas/UserId'
+        loginId:
+          type: string
+          example: student
+        role:
+          $ref: '#/components/schemas/UserRole'
+        active:
+          type: boolean
+          example: true
+    CreateUserInput:
+      type: object
+      required: [loginId, password]
+      additionalProperties: false
+      properties:
+        loginId:
+          type: string
+          minLength: 1
+          maxLength: 64
+          pattern: '^[A-Za-z0-9._-]+$'
+          example: berlin
+        password:
+          type: string
+          format: password
+          writeOnly: true
+          minLength: 1
+          maxLength: 128
+    AssigneeId:
+      type: integer
+      format: int64
+      nullable: true
+      minimum: 1
+      maximum: 9007199254740991
+      description: 担当者のユーザーID。未割り当てはnull。
+      example: 2
+    AssignmentInput:
+      type: object
+      required: [assigneeId]
+      additionalProperties: false
+      properties:
+        assigneeId:
+          $ref: '#/components/schemas/AssigneeId'
+    AssignmentChange:
+      type: object
+      required: [id, previousAssigneeLoginId, newAssigneeLoginId, actorLoginId, changedAt]
+      properties:
+        id:
+          type: integer
+          format: int64
+        previousAssigneeLoginId:
+          type: string
+          nullable: true
+          example: null
+        newAssigneeLoginId:
+          type: string
+          nullable: true
+          example: berlin
+        actorLoginId:
+          type: string
+          example: student
+        changedAt:
+          type: string
+          format: date-time
+          description: 担当変更が行われた時刻。
+    PlaceId:
+      type: integer
+      format: int32
+      minimum: 1
+      maximum: 2147483647
+      example: 1
+    Category:
+      type: string
+      description: sightseeing は観光、nature は自然、food は食事。
+      enum: [sightseeing, nature, food]
+      example: sightseeing
+    PlaceMapFields:
+      type: object
+      required: [name, category, longitude, latitude]
+      properties:
+        name:
+          type: string
+          description: 場所の名前。Unicodeの空白文字のみの値は400になります。
+          minLength: 1
+          maxLength: 80
+          pattern: '[^\t-\r \u0085\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]'
+          example: ブランデンブルク門
+        category:
+          $ref: '#/components/schemas/Category'
+        longitude:
+          type: number
+          format: double
+          description: 経度（度）。
+          minimum: -180
+          maximum: 180
+          example: 13.3777
+        latitude:
+          type: number
+          format: double
+          description: 緯度（度）。背景地図のWebメルカトル表示範囲に合わせます。
+          minimum: -85.051129
+          maximum: 85.051129
+          example: 52.5163
+    Memo:
+      type: string
+      description: 場所のメモ。メモがない場合は空文字を指定します。
+      maxLength: 500
+      example: ベルリン観光の初日に訪れたい
+    PlaceInput:
+      allOf:
+        - $ref: '#/components/schemas/PlaceMapFields'
+        - type: object
+          required: [memo]
+          properties:
+            memo:
+              $ref: '#/components/schemas/Memo'
+    PlaceSummary:
+      allOf:
+        - $ref: '#/components/schemas/PlaceMapFields'
+        - type: object
+          required: [id, assigneeId]
+          properties:
+            id:
+              $ref: '#/components/schemas/PlaceId'
+            assigneeId:
+              $ref: '#/components/schemas/AssigneeId'
+    Place:
+      allOf:
+        - $ref: '#/components/schemas/PlaceSummary'
+        - type: object
+          required: [memo]
+          properties:
+            memo:
+              $ref: '#/components/schemas/Memo'
+    AreaId:
+      type: integer
+      format: int32
+      minimum: 1
+      maximum: 2147483647
+      example: 1
+    AreaETag:
+      type: string
+      pattern: '^"area-[1-9][0-9]*-v[1-9][0-9]*"$'
+      example: '"area-1-v1"'
+    AreaPolygon:
+      type: object
+      description: EPSG:4326のGeoJSON Polygon。外周は1本で、3〜200頂点と閉点からなります。
+      required: [type, coordinates]
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          enum: [Polygon]
+        coordinates:
+          type: array
+          minItems: 1
+          maxItems: 1
+          items:
+            type: array
+            minItems: 4
+            maxItems: 201
+            items:
+              type: array
+              description: 経度（±180度）、緯度（±85.051129度）の順です。
+              minItems: 2
+              maxItems: 2
+              items:
+                type: number
+                format: double
+    AreaName:
+      type: string
+      minLength: 1
+      maxLength: 80
+      pattern: '[^\t-\r \u0085\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]'
+    AreaInput:
+      type: object
+      required: [name, assigneeId, geometry]
+      additionalProperties: false
+      properties:
+        name:
+          $ref: '#/components/schemas/AreaName'
+        assigneeId:
+          $ref: '#/components/schemas/UserId'
+        geometry:
+          $ref: '#/components/schemas/AreaPolygon'
+    Area:
+      type: object
+      required: [id, name, assigneeId, geometry]
+      properties:
+        id:
+          $ref: '#/components/schemas/AreaId'
+        name:
+          $ref: '#/components/schemas/AreaName'
+        assigneeId:
+          $ref: '#/components/schemas/UserId'
+        geometry:
+          $ref: '#/components/schemas/AreaPolygon'
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          enum: [INVALID_INPUT, INVALID_CREDENTIALS, UNAUTHENTICATED, INVALID_ORIGIN, FORBIDDEN, PLACE_NOT_FOUND, USER_NOT_FOUND, LOGIN_ID_TAKEN, AREA_NOT_FOUND, area_version_mismatch]
+        message:
+          type: string
+        fieldErrors:
+          type: object
+          description: |
+            入力欄ごとのエラーです。キーはリクエストの項目名、値はその欄に表示する理由です。
+            JSONの形式やパスなど、入力欄に対応しないエラーだけの場合は省略します。
+          additionalProperties:
+            type: string
+  requestBodies:
+    AreaInput:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AreaInput'
+          example:
+            name: ベルリン中心部
+            assigneeId: 2
+            geometry:
+              type: Polygon
+              coordinates: [[[13.35, 52.50], [13.41, 52.50], [13.38, 52.54], [13.35, 52.50]]]
+    PlaceInput:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PlaceInput'
+          example:
+            name: ブランデンブルク門
+            category: sightseeing
+            longitude: 13.3777
+            latitude: 52.5163
+            memo: ベルリン観光の初日に訪れたい
+  responses:
+    AreaWithETag:
+      description: 担当エリアの詳細と現在の版。
+      headers:
+        ETag:
+          $ref: '#/components/headers/AreaETag'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Area'
+    InvalidAreaInput:
+      description: パス、If-Match、リクエストボディのいずれかが不正です。
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: INVALID_INPUT
+            message: 入力内容を確認してください。
+            fieldErrors:
+              geometry: 外周の辺が交差しています。
+    AreaNotFound:
+      description: 指定した担当エリアが見つかりません。
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: AREA_NOT_FOUND
+            message: 指定した担当エリアが見つかりません。
+    Unauthorized:
+      description: ログインしていないか、セッションが期限切れまたは失効しています。
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: UNAUTHENTICATED
+            message: ログインしてください。
+    InvalidOrigin:
+      description: 更新リクエストの Origin が欠落しているか、許可されていません。
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: INVALID_ORIGIN
+            message: このオリジンからの更新は許可されていません。
+    Forbidden:
+      description: この操作に必要な権限がありません。
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: FORBIDDEN
+            message: この操作に必要な権限がありません。
+    WriteForbidden:
+      description: 操作権限がないか、更新リクエストの Origin が欠落または許可されていません。
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            forbidden:
+              value:
+                code: FORBIDDEN
+                message: この操作に必要な権限がありません。
+            invalidOrigin:
+              value:
+                code: INVALID_ORIGIN
+                message: このオリジンからの更新は許可されていません。
+    BadRequest:
+      description: パス、クエリ、リクエストボディのいずれかが不正です。
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: INVALID_INPUT
+            message: 検索条件が正しくありません。
+    InvalidPlaceInput:
+      description: URLまたはリクエストボディが不正です。入力欄に対応する問題は fieldErrors で返します。
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            invalidFields:
+              summary: 緯度が範囲外でメモが未指定の場合
+              value:
+                code: INVALID_INPUT
+                message: 入力内容を確認してください。
+                fieldErrors:
+                  latitude: -85.051129 以上 85.051129 以下の数値を入力してください。
+                  memo: 必須項目です。
+            invalidBody:
+              summary: JSONの形式が不正な場合
+              value:
+                code: INVALID_INPUT
+                message: リクエストボディを application/json のJSONオブジェクトで送信してください。
+    NotFound:
+      description: 指定したIDの場所が見つかりません。
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: PLACE_NOT_FOUND
+            message: 指定した場所が見つかりません。

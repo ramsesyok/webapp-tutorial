@@ -18,6 +18,11 @@ const (
 	SessionCookieScopes = "sessionCookie.Scopes"
 )
 
+// Defines values for AreaPolygonType.
+const (
+	Polygon AreaPolygonType = "Polygon"
+)
+
 // Defines values for Category.
 const (
 	Food        Category = "food"
@@ -27,14 +32,16 @@ const (
 
 // Defines values for ErrorCode.
 const (
-	FORBIDDEN          ErrorCode = "FORBIDDEN"
-	INVALIDCREDENTIALS ErrorCode = "INVALID_CREDENTIALS"
-	INVALIDINPUT       ErrorCode = "INVALID_INPUT"
-	INVALIDORIGIN      ErrorCode = "INVALID_ORIGIN"
-	LOGINIDTAKEN       ErrorCode = "LOGIN_ID_TAKEN"
-	PLACENOTFOUND      ErrorCode = "PLACE_NOT_FOUND"
-	UNAUTHENTICATED    ErrorCode = "UNAUTHENTICATED"
-	USERNOTFOUND       ErrorCode = "USER_NOT_FOUND"
+	AREANOTFOUND        ErrorCode = "AREA_NOT_FOUND"
+	AreaVersionMismatch ErrorCode = "area_version_mismatch"
+	FORBIDDEN           ErrorCode = "FORBIDDEN"
+	INVALIDCREDENTIALS  ErrorCode = "INVALID_CREDENTIALS"
+	INVALIDINPUT        ErrorCode = "INVALID_INPUT"
+	INVALIDORIGIN       ErrorCode = "INVALID_ORIGIN"
+	LOGINIDTAKEN        ErrorCode = "LOGIN_ID_TAKEN"
+	PLACENOTFOUND       ErrorCode = "PLACE_NOT_FOUND"
+	UNAUTHENTICATED     ErrorCode = "UNAUTHENTICATED"
+	USERNOTFOUND        ErrorCode = "USER_NOT_FOUND"
 )
 
 // Defines values for UserRole.
@@ -42,6 +49,43 @@ const (
 	Admin    UserRole = "admin"
 	Assignee UserRole = "assignee"
 )
+
+// Area defines model for Area.
+type Area struct {
+	AssigneeId UserId `json:"assigneeId"`
+
+	// Geometry EPSG:4326のGeoJSON Polygon。外周は1本で、3〜200頂点と閉点からなります。
+	Geometry AreaPolygon `json:"geometry"`
+	Id       AreaId      `json:"id"`
+	Name     AreaName    `json:"name"`
+}
+
+// AreaETag defines model for AreaETag.
+type AreaETag = string
+
+// AreaId defines model for AreaId.
+type AreaId = int32
+
+// AreaInput defines model for AreaInput.
+type AreaInput struct {
+	AssigneeId UserId `json:"assigneeId"`
+
+	// Geometry EPSG:4326のGeoJSON Polygon。外周は1本で、3〜200頂点と閉点からなります。
+	Geometry AreaPolygon `json:"geometry"`
+	Name     AreaName    `json:"name"`
+}
+
+// AreaName defines model for AreaName.
+type AreaName = string
+
+// AreaPolygon EPSG:4326のGeoJSON Polygon。外周は1本で、3〜200頂点と閉点からなります。
+type AreaPolygon struct {
+	Coordinates [][][]float64   `json:"coordinates"`
+	Type        AreaPolygonType `json:"type"`
+}
+
+// AreaPolygonType defines model for AreaPolygon.Type.
+type AreaPolygonType string
 
 // AssigneeId 担当者のユーザーID。未割り当てはnull。
 type AssigneeId = int64
@@ -187,11 +231,20 @@ type UserId = int64
 // UserRole admin は管理者、assignee は担当者。
 type UserRole string
 
+// AreaNotFound defines model for AreaNotFound.
+type AreaNotFound = Error
+
+// AreaWithETag defines model for AreaWithETag.
+type AreaWithETag = Area
+
 // BadRequest defines model for BadRequest.
 type BadRequest = Error
 
 // Forbidden defines model for Forbidden.
 type Forbidden = Error
+
+// InvalidAreaInput defines model for InvalidAreaInput.
+type InvalidAreaInput = Error
 
 // InvalidOrigin defines model for InvalidOrigin.
 type InvalidOrigin = Error
@@ -208,6 +261,12 @@ type Unauthorized = Error
 // WriteForbidden defines model for WriteForbidden.
 type WriteForbidden = Error
 
+// UpdateAreaParams defines parameters for UpdateArea.
+type UpdateAreaParams struct {
+	// IfMatch 詳細取得時の ETag を引用符も含めて指定します。タグ1個を受け付けます。
+	IfMatch AreaETag `json:"If-Match"`
+}
+
 // ListPlacesParams defines parameters for ListPlaces.
 type ListPlacesParams struct {
 	// Q 名前またはメモの部分一致です。検索語の前後の空白を取り除き、
@@ -217,6 +276,12 @@ type ListPlacesParams struct {
 	// Category カテゴリの完全一致。すべてのカテゴリを対象にする場合は、このパラメータを省略します。
 	Category *Category `form:"category,omitempty" json:"category,omitempty"`
 }
+
+// CreateAreaJSONRequestBody defines body for CreateArea for application/json ContentType.
+type CreateAreaJSONRequestBody = AreaInput
+
+// UpdateAreaJSONRequestBody defines body for UpdateArea for application/json ContentType.
+type UpdateAreaJSONRequestBody = AreaInput
 
 // CreatePlaceJSONRequestBody defines body for CreatePlace for application/json ContentType.
 type CreatePlaceJSONRequestBody = PlaceInput
@@ -235,6 +300,18 @@ type CreateUserJSONRequestBody = CreateUserInput
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// 担当エリアの一覧を取得する
+	// (GET /areas)
+	ListAreas(w http.ResponseWriter, r *http.Request)
+	// 担当エリアを登録する
+	// (POST /areas)
+	CreateArea(w http.ResponseWriter, r *http.Request)
+	// 担当エリアの詳細と版を取得する
+	// (GET /areas/{areaId})
+	GetArea(w http.ResponseWriter, r *http.Request, areaId AreaId)
+	// 担当エリアを更新する
+	// (PUT /areas/{areaId})
+	UpdateArea(w http.ResponseWriter, r *http.Request, areaId AreaId, params UpdateAreaParams)
 	// 場所の一覧を取得・検索する
 	// (GET /places)
 	ListPlaces(w http.ResponseWriter, r *http.Request, params ListPlacesParams)
@@ -284,6 +361,136 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// ListAreas operation middleware
+func (siw *ServerInterfaceWrapper) ListAreas(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAreas(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateArea operation middleware
+func (siw *ServerInterfaceWrapper) CreateArea(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateArea(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetArea operation middleware
+func (siw *ServerInterfaceWrapper) GetArea(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "areaId" -------------
+	var areaId AreaId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "areaId", r.PathValue("areaId"), &areaId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "areaId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetArea(w, r, areaId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateArea operation middleware
+func (siw *ServerInterfaceWrapper) UpdateArea(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "areaId" -------------
+	var areaId AreaId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "areaId", r.PathValue("areaId"), &areaId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "areaId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateAreaParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch AreaETag
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = IfMatch
+
+	} else {
+		err := fmt.Errorf("Header parameter If-Match is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "If-Match", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateArea(w, r, areaId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // ListPlaces operation middleware
 func (siw *ServerInterfaceWrapper) ListPlaces(w http.ResponseWriter, r *http.Request) {
@@ -746,6 +953,10 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
+	m.HandleFunc("GET "+options.BaseURL+"/areas", wrapper.ListAreas)
+	m.HandleFunc("POST "+options.BaseURL+"/areas", wrapper.CreateArea)
+	m.HandleFunc("GET "+options.BaseURL+"/areas/{areaId}", wrapper.GetArea)
+	m.HandleFunc("PUT "+options.BaseURL+"/areas/{areaId}", wrapper.UpdateArea)
 	m.HandleFunc("GET "+options.BaseURL+"/places", wrapper.ListPlaces)
 	m.HandleFunc("POST "+options.BaseURL+"/places", wrapper.CreatePlace)
 	m.HandleFunc("DELETE "+options.BaseURL+"/places/{placeId}", wrapper.DeletePlace)
