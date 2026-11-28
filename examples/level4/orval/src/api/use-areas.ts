@@ -1,7 +1,7 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { areaNameSchema } from '../area-name';
 import {
-  getGetAreaQueryKey, getListAreasQueryKey, updateArea, useCreateArea, useGetArea, useListAreas,
+  getGetAreaQueryKey, getListAreasQueryKey, useCreateArea, useGetArea, useListAreas, useUpdateArea,
   type Area, type AreaInput,
 } from './generated/places';
 import { UpdateAreaBody } from './generated/validation';
@@ -32,10 +32,7 @@ export function useAreaDetail(areaId: number | undefined) {
 export function useAreaActions() {
   const client = useQueryClient();
   const create = useCreateArea();
-  const update = useMutation({
-    mutationFn: ({ areaId, etag, input }: UpdateAreaRequest) =>
-      updateArea(areaId, input, { headers: { 'If-Match': etag } }),
-  });
+  const update = useUpdateArea();
 
   return {
     async createArea(input: AreaInput) {
@@ -45,7 +42,7 @@ export function useAreaActions() {
       return data;
     },
     async updateArea({ areaId, etag, input }: UpdateAreaRequest) {
-      await update.mutateAsync({ areaId, etag, input });
+      await update.mutateAsync({ areaId, data: input, headers: { 'If-Match': etag } });
       // 一覧の図形と、詳細の図形・ETagをサーバーの最新状態に揃える。
       await Promise.all([
         client.invalidateQueries({ queryKey: getListAreasQueryKey() }),

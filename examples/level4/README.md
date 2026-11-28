@@ -28,7 +28,7 @@ Hey API版では `examples/level4/hey-api` で同じコマンドを実行しま�
 
 ### 生成設定と出力先
 
-- **Orval**は生成したReact QueryフックとFetch関数を `src/api/generated/places.ts` に、Zodスキーマを同じディレクトリの `validation.ts` に出力します。[Orvalの生成設定](orval/orval.config.ts)
+- **Orval**は生成したReact QueryフックとFetch関数を `src/api/generated/places.ts` に、Zodスキーマを同じディレクトリの `validation.ts` に出力します。`output.headers: true` を設定し、OpenAPIのリクエストヘッダーを生成フックの引数の型に含めます。[Orvalの生成設定](orval/orval.config.ts)
 - **Hey API**は生成したFetch関数を `src/api/generated/sdk.gen.ts` に、React Queryに渡すオプションとキーを `@tanstack/react-query.gen.ts` に、Zodスキーマを `zod.gen.ts` に出力します。[Hey APIの生成設定](hey-api/openapi-ts.config.ts)
 
 ### 同じ保存操作をコードで追う
@@ -39,9 +39,9 @@ Hey API版では `examples/level4/hey-api` で同じコマンドを実行しま�
 | --- | --- | --- |
 | 詳細を開く | 生成フック `useGetArea` の `select` が本文とヘッダーを受け取り、`{ area, etag }` にまとめます。[useAreaDetail](orval/src/api/use-areas.ts#L19) | 生成された `getAreaOptions` の結果は本文だけです。詳細では `useQuery` の取得関数から生成SDKの `getArea` を `responseStyle: 'fields'` で呼び、本文とヘッダーを受け取ります。[useAreaDetail](hey-api/src/api/use-areas.ts#L23) |
 | 保存前に入力を検証する | `UpdateAreaBody` は、経度・緯度のペアを長さ2の数値配列として検証します。[areaInputSchema](orval/src/api/use-areas.ts#L10) | `zUpdateAreaBody` は同じペアを `[number, number]` のタプルとして検証します。担当者IDは生成Zodが `bigint` で返すので、安全な整数の範囲を検証した後、JSON送信用の `number` に戻します。[areaInputSchema](hey-api/src/api/use-areas.ts#L11) |
-| 下書きを保存する | `useMutation` に渡す `mutationFn` で生成済みの `updateArea` を呼び、`RequestInit.headers` に `If-Match` を渡します。[useAreaActions](orval/src/api/use-areas.ts#L32) | `useMutation(updateAreaMutation())` を使い、保存時に `path`、型付きの `headers`、`body` を渡します。[useAreaActions](hey-api/src/api/use-areas.ts#L38) |
-| 他のタブが先に保存した場合 | 生成クライアントが例外に付けたHTTPステータスを `error.status === 412` で確認します。[isAreaConflict](orval/src/api/use-areas.ts#L58) | 生成クライアントが例外として渡すエラー本文から `error.code === 'area_version_mismatch'` を確認します。[isAreaConflict](hey-api/src/api/use-areas.ts#L61) |
-| 更新に成功したら一覧・詳細を取り直す | `getListAreasQueryKey()` と `getGetAreaQueryKey(areaId)` を `invalidateQueries` に渡します。[更新後の再取得](orval/src/api/use-areas.ts#L47) | `listAreasQueryKey()` と `getAreaQueryKey({ path: { areaId } })` を渡します。詳細を取得するときも同じ生成キーを使います。[更新後の再取得](hey-api/src/api/use-areas.ts#L50) |
+| 下書きを保存する | 生成フック `useUpdateArea` を使い、保存時に `areaId`、`data`、型付きの `headers` を渡します。`If-Match` は必須です。[useAreaActions](orval/src/api/use-areas.ts#L32) | `useMutation(updateAreaMutation())` を使い、保存時に `path`、型付きの `headers`、`body` を渡します。[useAreaActions](hey-api/src/api/use-areas.ts#L38) |
+| 他のタブが先に保存した場合 | 生成クライアントが例外に付けたHTTPステータスを `error.status === 412` で確認します。[isAreaConflict](orval/src/api/use-areas.ts#L55) | 生成クライアントが例外として渡すエラー本文から `error.code === 'area_version_mismatch'` を確認します。[isAreaConflict](hey-api/src/api/use-areas.ts#L61) |
+| 更新に成功したら一覧・詳細を取り直す | `getListAreasQueryKey()` と `getGetAreaQueryKey(areaId)` を `invalidateQueries` に渡します。[更新後の再取得](orval/src/api/use-areas.ts#L44) | `listAreasQueryKey()` と `getAreaQueryKey({ path: { areaId } })` を渡します。詳細を取得するときも同じ生成キーを使います。[更新後の再取得](hey-api/src/api/use-areas.ts#L50) |
 
 どちらも保存前にZodで入力の構造を検証し、さらに `polygonError` で外周の閉じ方や自己交差を調べます。競合時は共通の `refreshLatest` が詳細を取り直し、下書きを残したまま最新の形状を表示します。「最新の形状から編集し直す」を押したとき、新しいタグで編集を始めます。[多角形の検証](orval/src/area-geometry.ts) · [競合後の再取得](orval/src/AreasPage.tsx#L88) · [再編集のボタン](orval/src/AreasPage.tsx#L217)
 
