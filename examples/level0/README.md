@@ -1,6 +1,6 @@
 # レベル0のSPA実装例
 
-[Orval版](orval) と [Hey API版](hey-api) は、同じレベル0バックエンドと [OpenAPI定義](../../schema/openapi.yaml) を使います。どちらもReact、MUI、OpenLayers、TanStack Query、Zustand、Zodで実装しています。画面から地図上の場所を登録し、検索、詳細取得、編集、削除、URL共有を試せます。
+[Orval版](orval) と [Hey API版](hey-api) は、同じレベル0バックエンドと [OpenAPI定義](../../schema/level0/openapi.yaml) を使います。どちらもReact、MUI、OpenLayers、TanStack Query、Zustand、Zodで実装しています。画面から地図上の場所を登録し、検索、詳細取得、編集、削除、URL共有を試せます。
 
 ## 起動
 

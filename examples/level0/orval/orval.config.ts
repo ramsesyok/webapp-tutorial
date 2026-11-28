@@ -2,7 +2,7 @@ import { defineConfig } from 'orval';
 
 export default defineConfig({
   places: {
-    input: '../../../schema/openapi.yaml',
+    input: '../../../schema/level0/openapi.yaml',
     output: {
       target: 'src/api/generated/places.ts',
       client: 'react-query',

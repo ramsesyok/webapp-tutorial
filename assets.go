@@ -6,5 +6,5 @@ import _ "embed"
 //go:embed map/world.pmtiles
 var WorldMap []byte
 
-//go:embed schema/openapi.yaml
+//go:embed schema/level0/openapi.yaml
 var OpenAPI []byte

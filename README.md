@@ -4,6 +4,8 @@
 
 対象は、JavaやC++などでプログラミングを経験し、ReactとTypeScriptを初めて学ぶ方です。地図・検索フォーム・一覧・詳細・登録編集フォームを1画面にまとめます。
 
+Orval版とHey API版の起動手順と比較方法は、[レベル0のSPA実装例](examples/level0/README.md)を参照してください。
+
 ## 学習の目的
 
 - OpenAPI定義からクエリ、パスパラメータ、JSONの型、HTTPステータスを読み取り、ReactからCRUDと検索のAPIを呼び出す。
@@ -16,7 +18,9 @@
 | 配布教材 | 内容 |
 | --- | --- |
 | バックエンドの実行ファイル | 講師が受講者のOSに合わせて配布する。場所API、Swagger UI、埋め込みの世界地図をローカルで提供する |
-| [schema/openapi.yaml](schema/openapi.yaml) | 場所APIの契約。入力制約、成功・エラー応答、検索の挙動はこの定義を参照する |
+| [レベル0のOpenAPI定義](schema/level0/openapi.yaml) | 場所APIの契約。入力制約、成功・エラー応答、検索の挙動はこの定義を参照する |
+
+配布ZIPでは、同じOpenAPI定義が `schema/openapi.yaml` に入ります。
 
 ### バックエンドの起動
 
