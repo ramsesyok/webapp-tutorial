@@ -1,0 +1,39 @@
+{
+  "name": "level4-hey-api",
+  "version": "4.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "generate:api": "openapi-ts && node scripts/escape-zod-line-separators.mjs",
+    "predev": "npm run generate:api",
+    "dev": "vite",
+    "prebuild": "npm run generate:api",
+    "build": "tsc --noEmit && vite build"
+  },
+  "dependencies": {
+    "@emotion/react": "11.14.0",
+    "@emotion/styled": "11.14.1",
+    "@mui/icons-material": "9.6.0",
+    "@mui/material": "9.6.0",
+    "@tanstack/react-query": "5.108.4",
+    "ol": "10.11.0",
+    "ol-pmtiles": "2.0.2",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "react-hook-form": "7.92.0",
+    "react-router": "7.18.7",
+    "zod": "4.6.7",
+    "zustand": "5.1.0"
+  },
+  "devDependencies": {
+    "@hey-api/openapi-ts": "0.99.0",
+    "@types/react": "19.3.3",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.3.0",
+    "typescript": "6.0.3",
+    "vite": "8.3.8"
+  }
+}

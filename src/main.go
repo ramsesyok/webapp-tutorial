@@ -62,7 +62,7 @@ func main() {
 }
 
 func newHandler(db *sql.DB, dist fs.FS, allowedOrigins []string, secureCookie bool) (http.Handler, error) {
-	spec, err := openapi3.NewLoader().LoadFromData(assets.OpenAPILevel3)
+	spec, err := openapi3.NewLoader().LoadFromData(assets.OpenAPILevel4)
 	if err != nil {
 		return nil, fmt.Errorf("load OpenAPI: %w", err)
 	}
@@ -82,7 +82,8 @@ func newHandler(db *sql.DB, dist fs.FS, allowedOrigins []string, secureCookie bo
 		placeAPI
 		sessionAPI
 		userAPI
-	}{placeAPI: placeAPI{db: db}, sessionAPI: session, userAPI: userAPI{db: db}}
+		areaAPI
+	}{placeAPI: placeAPI{db: db}, sessionAPI: session, userAPI: userAPI{db: db}, areaAPI: areaAPI{db: db}}
 	apiRoutes := HandlerWithOptions(api, StdHTTPServerOptions{
 		BaseURL:     "/api",
 		Middlewares: []MiddlewareFunc{validate},
@@ -102,7 +103,7 @@ func newHandler(db *sql.DB, dist fs.FS, allowedOrigins []string, secureCookie bo
 	})
 	mux.HandleFunc("GET /swagger/openapi.yaml", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/yaml")
-		http.ServeContent(w, r, "openapi.yaml", time.Time{}, bytes.NewReader(assets.OpenAPILevel3))
+		http.ServeContent(w, r, "openapi.yaml", time.Time{}, bytes.NewReader(assets.OpenAPILevel4))
 	})
 	mux.Handle("GET /swagger/", v5emb.New(spec.Info.Title, "/swagger/openapi.yaml", "/swagger/"))
 	mux.Handle("/", spaHandler(dist))

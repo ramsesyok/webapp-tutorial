@@ -16,11 +16,11 @@ type placeAPI struct {
 	db *sql.DB
 }
 
-type placeReader interface {
+type rowQuerier interface {
 	QueryRowContext(context.Context, string, ...any) *sql.Row
 }
 
-func readAccessiblePlace(r *http.Request, db placeReader, id PlaceId) (Place, error) {
+func readAccessiblePlace(r *http.Request, db rowQuerier, id PlaceId) (Place, error) {
 	place, err := scanPlace(db.QueryRowContext(r.Context(), `
 		SELECT id, name, category, longitude, latitude, memo, assignee_id FROM places WHERE id = ?
 	`, id))
