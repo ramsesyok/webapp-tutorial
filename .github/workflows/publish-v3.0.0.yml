@@ -1,0 +1,100 @@
+name: Publish tutorial v3.0.0
+on:
+  push:
+    branches: [release-v3.0.0]
+permissions:
+  contents: write
+env:
+  SOURCE_SHA: da8b6433cd0f6fcdfaf5f7fa2691c0b80cf0205d
+  RELEASE_TAG: v3.0.0
+  ASSET_NAME: webapp-tutorial-v3.0.0-windows-amd64.zip
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Test backend
+        run: go test ./...
+      - name: Build Windows package
+        shell: bash
+        run: |
+          package_dir="$RUNNER_TEMP/package"
+          mkdir -p "$package_dir/schema"
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o "$package_dir/webapp-tutorial.exe" ./src
+          cp schema/level3/openapi.yaml "$package_dir/schema/openapi.yaml"
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+
+          readme = Path("README.md").read_text(encoding="utf-8")
+          readme = readme.replace(
+              "# 世界の行きたい場所マップ",
+              "# 学習レベル3 バックエンド v3.0.0\n\nWindows amd64向けの配布版です。",
+              1,
+          )
+          readme = readme.replace(
+              "(examples/level2/README.md)",
+              "(https://github.com/ramsesyok/webapp-tutorial/blob/v2.0.0/examples/level2/README.md)",
+          )
+          readme = readme.replace(
+              "[レベル0のOpenAPI](schema/openapi.yaml)",
+              "[レベル0のOpenAPI](https://github.com/ramsesyok/webapp-tutorial/blob/v0.1.0/schema/openapi.yaml)",
+          )
+          readme = readme.replace(
+              "(examples/level1/README.md)",
+              "(https://github.com/ramsesyok/webapp-tutorial/blob/v1.0.0/examples/level1/README.md)",
+          )
+          readme = readme.replace(
+              "(schema/level1/openapi.yaml)",
+              "(https://github.com/ramsesyok/webapp-tutorial/blob/v1.0.0/schema/level1/openapi.yaml)",
+          )
+          readme = readme.replace("(schema/level3/openapi.yaml)", "(schema/openapi.yaml)")
+          readme = readme.replace(
+              "(examples/level3/README.md)",
+              "(https://github.com/ramsesyok/webapp-tutorial/blob/v3.0.0/examples/level3/README.md)",
+          )
+          readme = readme.replace(
+              "(schema/level2/openapi.yaml)",
+              "(https://github.com/ramsesyok/webapp-tutorial/blob/v2.0.0/schema/level2/openapi.yaml)",
+          )
+          readme = readme.replace(
+              "## 学習レベル3 ユーザー、担当拠点、変更履歴を管理する\n\n",
+              "## 学習レベル3 ユーザー、担当拠点、変更履歴を管理する\n\n"
+              "初期管理者のログインIDは `student` です。パスワードは初回の起動ログに表示されます。"
+              "講師が指定する場合は、初回起動前に環境変数 `TUTORIAL_INITIAL_PASSWORD` を設定します。"
+              "レベル2のDBを引き継ぐ場合は、複製したDBを `-db` で指定します。"
+              "従来のパスワードで再ログインしてください。\n\n",
+          )
+          output = Path(os.environ["RUNNER_TEMP"]) / "package" / "README.md"
+          output.write_text(readme, encoding="utf-8")
+          PY
+          (cd "$package_dir" && zip -X -9 "$RUNNER_TEMP/$ASSET_NAME" README.md webapp-tutorial.exe schema/openapi.yaml)
+          unzip -t "$RUNNER_TEMP/$ASSET_NAME"
+          cmp <(unzip -p "$RUNNER_TEMP/$ASSET_NAME" schema/openapi.yaml) schema/level3/openapi.yaml
+      - name: Publish release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > "$RUNNER_TEMP/release-notes.md" <<'NOTES'
+          学習レベル3のWindows amd64向けバックエンドです。ZIPには実行ファイル、README、OpenAPI定義 `schema/openapi.yaml` が含まれます。
+
+          管理者は担当者の作成・無効化、拠点への担当者の割り当て・解除を行えます。担当者には自分の担当拠点が表示されます。拠点詳細で担当変更の前後、実行者、時刻を確認できます。
+
+          初期管理者のログインIDは `student` で、初回起動時のパスワードは起動ログに表示されます。レベル2のDBを移行する場合、既存の拠点と `student` のパスワードを引き継ぎます。移行前のセッションは失効します。
+
+          PowerShellで展開先を開き、`.\webapp-tutorial.exe` を実行してください。Swagger UIは <http://127.0.0.1:8080/swagger/> で開けます。
+
+          [学習レベル3のSPA実装例](https://github.com/ramsesyok/webapp-tutorial/tree/v3.0.0/examples/level3)
+          NOTES
+          digest=$(sha256sum "$RUNNER_TEMP/$ASSET_NAME" | cut -d ' ' -f 1)
+          printf '\nSHA-256（Windows amd64 ZIP） `%s`\n' "$digest" >> "$RUNNER_TEMP/release-notes.md"
+          gh release create "$RELEASE_TAG" "$RUNNER_TEMP/$ASSET_NAME" \
+            --repo "$GITHUB_REPOSITORY" --title "$RELEASE_TAG" --notes-file "$RUNNER_TEMP/release-notes.md" \
+            --target "$SOURCE_SHA"
