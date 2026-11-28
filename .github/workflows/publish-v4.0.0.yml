@@ -1,0 +1,72 @@
+name: Publish tutorial v4.0.0
+on:
+  push:
+    branches: [release-v4.0.0]
+permissions:
+  contents: write
+env:
+  SOURCE_SHA: 96cff675093ab668ecfc71e9d07d958133ca7f43
+  RELEASE_TAG: v4.0.0
+  ASSET_NAME: webapp-tutorial-v4.0.0-windows-amd64.zip
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Test backend
+        run: go test ./...
+      - name: Build Windows package
+        shell: bash
+        run: |
+          package_dir="$RUNNER_TEMP/package"
+          mkdir -p "$package_dir/schema"
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o "$package_dir/webapp-tutorial.exe" ./src
+          cp schema/level4/openapi.yaml "$package_dir/schema/openapi.yaml"
+
+          cat > "$package_dir/README.md" <<'README'
+          # 学習レベル4 バックエンド v4.0.0
+
+          Windows amd64向けの配布版です。ZIPを展開し、展開先をPowerShellで開いて起動します。
+
+          ```powershell
+          .\webapp-tutorial.exe -db places-level4.sqlite
+          ```
+
+          [Swagger UI](http://127.0.0.1:8080/swagger/) でAPIを確認できます。初期管理者のログインIDは `student` です。初回のパスワードは起動ログに表示されます。講師が指定する場合は、DBを初めて開く前に環境変数 `TUTORIAL_INITIAL_PASSWORD` を設定します。
+
+          レベル3の拠点、担当者、担当変更履歴を引き継ぐ場合は、レベル3のDBを複製して `-db` に指定し、従来のアカウントでログインします。
+
+          README
+          sed -n '/^## 学習レベル4 /,$p' README.md \
+            | sed -e 's|](schema/level4/openapi.yaml)|](schema/openapi.yaml)|g' \
+                  -e "s|](examples/level4/README.md)|](https://github.com/$GITHUB_REPOSITORY/blob/$RELEASE_TAG/examples/level4/README.md)|g" \
+            >> "$package_dir/README.md"
+
+          (cd "$package_dir" && zip -X -9 "$RUNNER_TEMP/$ASSET_NAME" README.md webapp-tutorial.exe schema/openapi.yaml)
+          unzip -t "$RUNNER_TEMP/$ASSET_NAME"
+          cmp <(unzip -p "$RUNNER_TEMP/$ASSET_NAME" schema/openapi.yaml) schema/level4/openapi.yaml
+      - name: Publish release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > "$RUNNER_TEMP/release-notes.md" <<'NOTES'
+          学習レベル4のWindows amd64向けバックエンドです。ZIPには実行ファイル、README、OpenAPI定義 `schema/openapi.yaml` が含まれます。
+
+          管理者は地図上で担当エリアを登録・割り当てでき、担当者は自分のエリアの名前と多角形を編集できます。更新には `ETag` と `If-Match` を使い、別の編集が先に保存された場合は `412` を返します。
+
+          PowerShellで展開先を開き、`.\webapp-tutorial.exe -db places-level4.sqlite` を実行してください。[Swagger UI](http://127.0.0.1:8080/swagger/) でAPIを確認できます。初期管理者は `student` で、初回パスワードは起動ログに表示されます。
+
+          [学習レベル4のSPA実装例](https://github.com/ramsesyok/webapp-tutorial/tree/v4.0.0/examples/level4)
+          NOTES
+          digest=$(sha256sum "$RUNNER_TEMP/$ASSET_NAME" | cut -d ' ' -f 1)
+          printf '\nSHA-256（Windows amd64 ZIP） `%s`\n' "$digest" >> "$RUNNER_TEMP/release-notes.md"
+          gh release create "$RELEASE_TAG" "$RUNNER_TEMP/$ASSET_NAME" \
+            --repo "$GITHUB_REPOSITORY" --title "$RELEASE_TAG" --notes-file "$RUNNER_TEMP/release-notes.md" \
+            --target "$SOURCE_SHA"
