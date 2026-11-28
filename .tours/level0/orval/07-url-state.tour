@@ -1,0 +1,37 @@
+{
+  "title": "レベル0 Orval 07 — 検索条件と選択をURLから復元する",
+  "description": "URLの読み書きから、共有、再読み込み、履歴移動までを追います。",
+  "nextTour": "レベル0 Orval 08 — OpenAPIから一覧取得までを追う",
+  "steps": [
+    {
+      "file": "examples/level0/orval/src/App.tsx",
+      "pattern": "const \\[params, setParams\\]",
+      "title": "URLから画面の状態を組み立てる",
+      "description": "`useSearchParams` は現在のクエリ文字列と更新関数を返します。`getSearchFilters` は `q`・`category`、`getSelectedId` は `place` を取り出し、それぞれ一覧・詳細取得の引数になります。"
+    },
+    {
+      "file": "examples/level0/orval/src/places.ts",
+      "pattern": "export function getSelectedId",
+      "title": "URLに書かれた文字列を検査する",
+      "description": "URL の値は文字列です。`getSelectedId` は `1` から `2147483647` までの整数を表す文字列を選択 ID として読み取ります。上の `getSearchFilters` では前後の空白を取り除いたキーワードと、定義済みカテゴリを取り出します。"
+    },
+    {
+      "file": "examples/level0/orval/src/App.tsx",
+      "pattern": "function select\\(id:",
+      "title": "選択と検索条件をURLに書き込む",
+      "description": "`select` は現在のパラメーターをコピーし、`place` だけを更新します。下の `applySearch` も同じ要領で `q`・`category` を更新します。書き換えた結果が異なるときだけ `setParams` を呼ぶので、同じ選択や検索で履歴を増やさずに済みます。"
+    },
+    {
+      "file": "examples/level0/orval/src/App.tsx",
+      "pattern": "const outsideResult",
+      "title": "選択した場所が検索結果から外れたとき",
+      "description": "一覧と詳細の両方の取得が成功し、一覧の取得が落ち着いてから、選択した場所が一覧に含まれるかを確認します。対象外なら `replace: true` で履歴を追加せず `place` を外します。存在しない ID の場合は、詳細取得のエラーが詳細欄に表示されます。"
+    },
+    {
+      "file": "examples/level0/orval/src/App.tsx",
+      "pattern": "async function copyLink",
+      "title": "ブラウザーで確かめる",
+      "description": "「ベルリン」で検索し、該当する場所を選んで「URLをコピー」を押します。別タブで開いて検索と選択を確認し、再読み込みします。元のタブで別の検索条件を適用してから「戻る」「進む」を試し、URL・検索欄・選択がどう切り替わるかを比べます。"
+    }
+  ]
+}

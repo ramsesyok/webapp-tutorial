@@ -1,0 +1,37 @@
+{
+  "title": "レベル0 Orval 04 — TypeScriptの型からデータの形を読む",
+  "description": "場所の型、フォームの作成・編集モード、実行時の入力検証を読み分けます。",
+  "nextTour": "レベル0 Orval 05 — Reactの画面に地図を載せる",
+  "steps": [
+    {
+      "file": "examples/level0/orval/src/places.ts",
+      "pattern": "export type PlaceInput",
+      "title": "入力・一覧・詳細の型を読み分ける",
+      "description": "`z.infer` は Zod のスキーマから TypeScript の型を取り出します。`Place` は交差型 `&` で入力に ID を加えた型です。`Omit` で `memo` を省いた `PlaceSummary` は一覧向け、`Pick` で経度と緯度を選んだ `Coordinates` は地図の位置指定向けです。"
+    },
+    {
+      "file": "examples/level0/orval/src/places.ts",
+      "pattern": "export type SearchFilters",
+      "title": "検索条件には省略できる項目がある",
+      "description": "`q?` と `category?` の `?` は、その項目自体を省略できる印です。`Category` は3種類のカテゴリのいずれかです。文字列なら何でも渡せる型と異なり、値の候補がコードから分かります。"
+    },
+    {
+      "file": "examples/level0/orval/src/PlaceEditor.tsx",
+      "pattern": "export type Editor",
+      "title": "モードを見て使えるデータを絞る",
+      "description": "`|` は2種類のオブジェクトのどちらかを表すユニオン型です。`editor.mode === 'edit'` と判定したあとは `editor.place` が使えます。`create` のときの `coordinates?` は、座標を直接入力する場合に省略できます。"
+    },
+    {
+      "file": "examples/level0/orval/src/PlaceEditor.tsx",
+      "pattern": "placeInputSchema\\.safeParse",
+      "title": "型と実行時の入力検証をつなぐ",
+      "description": "TypeScript の型は開発時に使います。ブラウザーでユーザーが入力した値は実行時に Zod の `safeParse` で検証します。分岐のあと、成功時の `result.data` と失敗時の `result.error` がどこに渡るか追ってください。"
+    },
+    {
+      "file": "examples/level0/orval/src/PlaceEditor.tsx",
+      "pattern": "const \\[fields, setFields\\]",
+      "title": "ブラウザーで確かめる",
+      "description": "「場所を追加」から「座標を入力」を選んだときと、既存の場所の「編集」を開いたときを比べます。どの初期値が `editor.mode`、`editor.coordinates`、`editor.place` から来るか説明し、両方ともキャンセルします。"
+    }
+  ]
+}

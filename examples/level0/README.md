@@ -28,7 +28,27 @@ npm run dev -- --port 5174 --strictPort
 
 `npm run dev` と `npm run build` は、実行前にコードを生成します。生成コードだけを見たい場合は `npm run generate:api` を実行し、各サンプルの `src/api/generated/` を開きます。配布バイナリからSPAを配信する場合は、どちらかのサンプルで `npm run build` を実行し、生成された `dist` をバックエンド実行ファイルの隣に置きます。
 
+## CodeTourでOrval版を読む
+
+VS Codeで **リポジトリのルート** を開き、[CodeTour拡張機能](https://marketplace.visualstudio.com/items?itemName=vsls-contrib.codetour) をインストールします。エクスプローラーの **CodeTour** で「レベル0 Orval 01」を選ぶと、コードの該当箇所に解説が表示されます。各ツアーの最後から次へ進めます。各テーマは一覧から直接開けます。
+
+レベル0で初めてReactとTypeScriptを使う方向けの順番です。ツアー01で起動とファイルの位置を確認し、02でReactの画面構成を読みます。APIのコード生成と開発時の通信経路は08で扱います。
+
+1. [ローカルで起動して画面とファイルを確認する](../../.tours/level0/orval/01-local-start.tour)
+2. [Reactアプリの入口と画面構成](../../.tours/level0/orval/02-react-entry.tour)
+3. [Reactの状態とイベントを読む](../../.tours/level0/orval/03-react-state.tour)
+4. [TypeScriptの型からデータの形を読む](../../.tours/level0/orval/04-typescript.tour)
+5. [Reactの画面に地図を載せる](../../.tours/level0/orval/05-map-render.tour)
+6. [地図のクリックを一覧・詳細・登録フォームにつなぐ](../../.tours/level0/orval/06-map-interaction.tour)
+7. [検索条件と選択をURLから復元する](../../.tours/level0/orval/07-url-state.tour)
+8. [OpenAPIから一覧取得までを追う](../../.tours/level0/orval/08-orval-query.tour)
+9. [保存後に一覧と地図が更新される理由](../../.tours/level0/orval/09-save-refresh.tour)
+10. [確認ダイアログから削除する](../../.tours/level0/orval/10-delete.tour)
+11. [取得中・0件・通信エラーを見分ける](../../.tours/level0/orval/11-request-states.tour)
+
 ## 比較する箇所
+
+技術検討では、VS Codeのエクスプローラーから **CodeTour → レベル0 技術比較 — OrvalとHey API** を開いてください。同じAPIに対して、生成物、クエリ・ミューテーション、キャッシュ、HTTPエラーの扱いを両版のコードで追えます。 [比較ツアー](../../.tours/level0/compare/orval-vs-hey-api.tour)
 
 | 処理 | Orval | Hey API |
 | --- | --- | --- |

@@ -1,0 +1,31 @@
+{
+  "title": "レベル0 Orval 10 — 確認ダイアログから削除する",
+  "description": "キャンセル、削除中、成功・失敗と、選択やキャッシュの片付けを読みます。",
+  "nextTour": "レベル0 Orval 11 — 取得中・0件・通信エラーを見分ける",
+  "steps": [
+    {
+      "file": "examples/level0/orval/src/App.tsx",
+      "pattern": "setToDelete\\(detail\\.data\\)",
+      "title": "削除対象を確認ダイアログへ渡す",
+      "description": "詳細の「削除」は `toDelete` に対象を入れます。`App` はこの値があるとき確認ダイアログを表示します。「キャンセル」は `toDelete` を空にしてダイアログを閉じます。"
+    },
+    {
+      "file": "examples/level0/orval/src/App.tsx",
+      "pattern": "async function remove\\(\\)",
+      "title": "削除の成功と失敗を扱う",
+      "description": "削除中はボタンを無効にします。成功したら `select(undefined)` で URL から選択を外し、確認ダイアログを閉じます。失敗時はダイアログ内にエラーを表示し、`finally` で削除中の状態を解除します。"
+    },
+    {
+      "file": "examples/level0/orval/src/api/use-places.ts",
+      "pattern": "async remove\\(id:",
+      "title": "削除済みのデータをキャッシュから片付ける",
+      "description": "`mutateAsync` が削除 API を呼びます。成功したら対象 ID の詳細キャッシュを取り除き、一覧を無効化して最新の結果を取得します。ピンの表示もその一覧から更新されます。"
+    },
+    {
+      "file": "schema/openapi.yaml",
+      "pattern": "operationId: deletePlace",
+      "title": "ブラウザーで確かめる",
+      "description": "自分で作った練習用の場所で「削除」→「キャンセル」を試し、一覧とピンが残ることを確認します。次に Network を開いて削除を確定し、`DELETE /api/places/{placeId}` が本文なしの `204` を返すこと、選択とピンが消え、再読み込み後も復活しないことを確認します。"
+    }
+  ]
+}

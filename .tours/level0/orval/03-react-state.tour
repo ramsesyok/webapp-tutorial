@@ -1,0 +1,43 @@
+{
+  "title": "レベル0 Orval 03 — Reactの状態とイベントを読む",
+  "description": "検索フォームと一覧を例に、props、useState、イベント、再描画をつなげます。",
+  "nextTour": "レベル0 Orval 04 — TypeScriptの型からデータの形を読む",
+  "steps": [
+    {
+      "file": "examples/level0/orval/src/App.tsx",
+      "pattern": "function SearchForm\\(",
+      "title": "親から受け取る値と関数を読む",
+      "description": "`SearchForm` の引数は props です。`filters` は初期値に使う適用済み条件、`onApply` は条件を親の `App` に渡す関数です。`{ filters, onApply }` は引数のオブジェクトから2つのプロパティを取り出す書き方です。"
+    },
+    {
+      "file": "examples/level0/orval/src/App.tsx",
+      "pattern": "const \\[q, setQ\\]",
+      "title": "入力とstateの往復を追う",
+      "description": "`useState` は現在の値と更新関数を返します。入力値は `value={q}` で表示され、入力イベントが `setQ` を呼ぶと React が新しい値でフォームを再描画します。キーワードとカテゴリはそれぞれ別の state です。"
+    },
+    {
+      "file": "examples/level0/orval/src/App.tsx",
+      "pattern": "function submit\\(event",
+      "title": "フォームの送信を親につなぐ",
+      "description": "`preventDefault()` でフォーム送信時のページ遷移を抑え、`onApply` を呼びます。親の JSX にある `onApply={applySearch}` をたどると、どの関数が実行されるか分かります。"
+    },
+    {
+      "file": "examples/level0/orval/src/App.tsx",
+      "pattern": "\\{places\\.map\\(\\(place\\)",
+      "title": "データの件数だけ一覧項目を描く",
+      "description": "配列の `map` で各場所を JSX に変換します。`key={place.id}` は件数や順序が変わっても React が項目を識別するために使います。選択表示は `selected={place.id === selectedId}` で決まります。"
+    },
+    {
+      "file": "examples/level0/orval/src/App.tsx",
+      "pattern": "\\{selectedId === undefined &&",
+      "title": "条件によって描画する内容を切り替える",
+      "description": "`条件 && <部品 />` は条件が真のときにその部品を表示する書き方です。選択前の案内と、詳細取得中の進行表示で、それぞれ何を条件にしているか比べてください。"
+    },
+    {
+      "file": "examples/level0/orval/src/App.tsx",
+      "pattern": "<SearchForm key=",
+      "title": "ブラウザーで確かめる",
+      "description": "キーワードを入力した時点では、入力欄だけが変わります。「検索」を押すと適用済み条件が変わり、一覧とピンが更新されます。検索条件を変えてからブラウザーで戻ると `key` が変わり、フォームがその条件を初期値として作り直されます。"
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "title": "レベル0 Orval 02 — Reactアプリの入口と画面構成",
+  "description": "HTMLからReactが起動し、地図・一覧・詳細が表示されるまでを読みます。",
+  "nextTour": "レベル0 Orval 03 — Reactの状態とイベントを読む",
+  "steps": [
+    {
+      "file": "examples/level0/orval/index.html",
+      "pattern": "<div id=\"root\">",
+      "title": "HTMLでReactの配置先を見つける",
+      "description": "`#root` は React が画面を書き込む場所です。すぐ下の `<script type=\"module\">` で `main.tsx` を読み込みます。`.tsx` では TypeScript の中に JSX を書けます。"
+    },
+    {
+      "file": "examples/level0/orval/src/main.tsx",
+      "pattern": "createRoot\\(document",
+      "title": "Reactを起動する",
+      "description": "`createRoot` が `#root` を受け取り、`render` がコンポーネントの木を表示します。`<App />` は自作のコンポーネントです。Java や C++ の経験があれば、まず `main.tsx` を実行の入口、`App` を画面の構成を返す関数と考えると追いやすくなります。"
+    },
+    {
+      "file": "examples/level0/orval/src/main.tsx",
+      "pattern": "<ThemeProvider",
+      "title": "画面全体で使う設定を渡す",
+      "description": "`ThemeProvider` は配色などを、`QueryClientProvider` は通信データを管理する QueryClient を、`BrowserRouter` はブラウザーの URL を扱う機能を、内側のコンポーネントで使えるようにします。JSX の入れ子を上から `<App />` まで読んでみましょう。"
+    },
+    {
+      "file": "examples/level0/orval/src/App.tsx",
+      "pattern": "<PlaceMap places=",
+      "title": "JSXで画面の部品を対応づける",
+      "description": "`App` の `return` には地図、場所一覧、場所の詳細が並びます。`<PlaceMap ... />` は地図を描く部品です。`places={places}` の左側は子が受け取る名前、波括弧の中は親が渡す JavaScript の値です。"
+    },
+    {
+      "file": "examples/level0/orval/src/App.tsx",
+      "pattern": "aria-labelledby=\"detail-title\"",
+      "title": "ブラウザーで確かめる",
+      "description": "地図・一覧・詳細の3領域を画面で指し示し、`App.tsx` で対応する `Paper` を探してください。次に一覧から場所を1件クリックし、詳細パネルで新たに表示された部分を JSX の式から見つけてみましょう。"
+    }
+  ]
+}

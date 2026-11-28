@@ -1,0 +1,37 @@
+{
+  "title": "レベル0 Orval 05 — Reactの画面に地図を載せる",
+  "description": "OpenLayersの配置、背景とピンのレイヤー、座標変換を読みます。",
+  "nextTour": "レベル0 Orval 06 — 地図のクリックを一覧・詳細・登録フォームにつなぐ",
+  "steps": [
+    {
+      "file": "examples/level0/orval/src/PlaceMap.tsx",
+      "pattern": "<div ref=\\{target\\}",
+      "title": "地図を置くDOM要素を見つける",
+      "description": "`ref={target}` で React が作った `div` を `target.current` から参照できます。`new Map` ではこの要素を OpenLayers に渡し、そこに地図を描画します。"
+    },
+    {
+      "file": "examples/level0/orval/src/PlaceMap.tsx",
+      "pattern": "const tiles = new PMTilesVectorSource",
+      "title": "背景地図とピンを重ねる",
+      "description": "`PMTilesVectorSource` はローカルバックエンドが配信する `/map/world.pmtiles` を参照します。背景のベクタータイルを先に、場所のピンを持つ `pinLayer` を後に置いて重ねています。"
+    },
+    {
+      "file": "examples/level0/orval/src/PlaceMap.tsx",
+      "pattern": "map\\.dispose\\(\\)",
+      "title": "地図の初期化と片付けを対にする",
+      "description": "地図の生成は `useEffect` で、DOM が使える状態になってから行います。Effect の後片付けでは参照を外し、`dispose()` で地図を解放します。このサンプルの `StrictMode` では開発時にセットアップと片付けが追加で実行されるため、片付けまで対にして読むと動作を理解しやすくなります。"
+    },
+    {
+      "file": "examples/level0/orval/src/PlaceMap.tsx",
+      "pattern": "pins\\.addFeatures",
+      "title": "経度・緯度からピンを作る",
+      "description": "`fromLonLat([経度, 緯度])` で API の座標を OpenLayers の表示用座標に変換し、点の `Feature` を作ります。検索結果や選択 ID が変わればピンを作り直します。ピンの ID には場所の ID が入ります。"
+    },
+    {
+      "file": "examples/level0/orval/src/PlaceMap.tsx",
+      "pattern": "radius: selected",
+      "title": "ブラウザーで確かめる",
+      "description": "検索で表示対象を絞り、世界地図の上のピンだけが切り替わることを確認します。ピンを選択すると大きさと枠線が変わります。式 `place.id === props.selectedId` がどのスタイルに使われるか探してください。"
+    }
+  ]
+}
