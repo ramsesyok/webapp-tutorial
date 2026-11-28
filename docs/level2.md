@@ -13,7 +13,7 @@
 
 1. [レベル1のSPA](level1.md)を用意し、レベル2の配布バックエンドを[共通の起動手順](../README.md#バックエンドの起動)で起動します。ソースから起動する場合は、配布タグ `v2.0.0` のルートで `go run ./src` を実行します。レベル1のSQLiteを開くと、拠点データを引き継いで利用者とセッションのテーブルが追加されます。
 2. 初期ログインIDは `student` です。講師がパスワードを指定する場合は、レベル2のデータベースを初めて開く前に環境変数 `TUTORIAL_INITIAL_PASSWORD` を設定します。未設定の場合は、ランダムに生成されたパスワードが初回の起動ログに一度表示されます。セッションの有効期間は8時間です。
-3. [レベル2のOpenAPI定義](../schema/level2/openapi.yaml)からクライアントを生成します。実装例の生成・起動手順とOrval・Hey APIの違いは[レベル2のSPA実装例](../examples/level2/README.md)を参照してください。
+3. レベル2のOpenAPI定義からクライアントを生成します。 [OpenAPI定義](../schema/level2/openapi.yaml) · [起動・生成手順](../examples/level2/README.md) · [OrvalとHey APIの技術比較](orval-hey-api-comparison.md#lv2-cookieセッション)
 
 Viteの既定構成ではブラウザーで `http://127.0.0.1:5173` を開き、相対URLの `/api` と `/map` をプロキシ経由で利用します。バックエンドはログイン・ログアウト・拠点の書き込みで `Origin` を検証します。Viteのポートを変えた場合は、バックエンドを `-spa-origin http://127.0.0.1:5174` のように実際のオリジンを指定して起動します。HTTPSプロキシ経由で利用する場合は、`-secure-cookie` とブラウザーで開くHTTPSオリジンを指定します。
 

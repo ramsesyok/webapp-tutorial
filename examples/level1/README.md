@@ -33,18 +33,7 @@ Hey API版は `examples/level1/hey-api` で同じコマンドを実行します�
 
 ## バリデーションを比較する
 
-| 処理 | Orval版 | Hey API版 |
-| --- | --- | --- |
-| Zodスキーマの生成 | `orval.config.ts` に `client: 'zod'` の出力を追加し、`src/api/generated/validation.ts` に生成する。 | `openapi-ts.config.ts` のプラグインに `zod` を追加し、`src/api/generated/zod.gen.ts` に生成する。 |
-| 登録・更新フォームの検証 | `CreatePlaceBody` または `UpdatePlaceBody` を `safeParse` で使う。 | `zCreatePlaceBody` または `zUpdatePlaceBody` を `safeParse` で使う。 |
-| 地図に表示する座標の検証 | `PlaceMapFields.pick` で経度と緯度のルールを取り出す。 | `zPlaceMapFields.pick` で同じ項目を取り出す。 |
-| APIが `400` を返したとき | 生成されたFetchクライアントが `Error` を投げ、本文は `error.info` に入る。 | 生成されたミューテーションオプションが `throwOnError: true` を指定し、本文がそのまま渡る。 |
-
-両版とも、`handleSubmit` が呼ぶリゾルバーで `validatePlaceInput` を実行し、緯度 `100` などを送信前に検出します。名前とメモはOpenAPIに合わせてコードポイント数で長さを判定するため、生成スキーマがUTF-16の長さだけで超過と判定した場合は数え直します。[Orval版](orval/src/places.ts)・[Hey API版](hey-api/src/places.ts)
-
-サーバーからの項目別エラーは、各版の `getApiError` が `fieldErrors` を取り出して画面に渡します。[Orval版のAPIフック](orval/src/api/use-places.ts)・[Hey API版のAPIフック](hey-api/src/api/use-places.ts)
-
-Hey API 0.99.0は、名前のパターンにある `U+2028` と `U+2029` を正規表現内に直接出力します。`npm run generate:api` は生成後に2文字をエスケープし、OpenAPIの名前の制約を保ったままコンパイルできるようにします。[生成後の補正スクリプト](hey-api/scripts/escape-zod-line-separators.mjs)
+生成Zodの使い方、`400` の項目別エラー、生成後の補正をまとめています。 [Lv1の技術比較](../../docs/orval-hey-api-comparison.md#lv1-フォームと生成zod)
 
 ## 確認手順
 

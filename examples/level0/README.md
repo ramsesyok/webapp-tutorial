@@ -48,19 +48,7 @@ VS Codeで **リポジトリのルート** を開き、[CodeTour拡張機能](ht
 
 ## 比較する箇所
 
-技術検討では、VS Codeのエクスプローラーから **CodeTour → レベル0 技術比較 — OrvalとHey API** を開いてください。同じAPIに対して、生成物、クエリ・ミューテーション、キャッシュ、HTTPエラーの扱いを両版のコードで追えます。 [比較ツアー](../../.tours/level0/compare/orval-vs-hey-api.tour)
-
-| 処理 | Orval | Hey API |
-| --- | --- | --- |
-| 一覧と詳細 | 生成された `useListPlaces` と `useGetPlace` を呼び、`select` でHTTPレスポンスの本文を取得 | 生成された `listPlacesOptions` と `getPlaceOptions` を `useQuery` に渡す。生成オプションが本文を返す |
-| 登録・編集・削除 | 生成されたミューテーション用フックを呼ぶ。リクエスト本文は `data` に渡す | 生成されたミューテーションオプションを `useMutation` に渡す。リクエスト本文は `body`、パスパラメーターは `path` に渡す |
-| キャッシュ更新 | `getListPlacesQueryKey()` で検索条件ごとの一覧を無効化 | `listPlacesQueryKey()` で検索条件ごとの一覧を無効化 |
-| HTTPエラー | `forceSuccessResponse` により非2xxをrejectし、本文はエラーの `info` に入る | 生成されたQueryオプションが `throwOnError` を設定し、非2xxの本文をthrowする |
-
-まず生成設定と `src/api/use-places.ts` を見比べると、ツールごとの使い方を追えます。画面、地図、フォーム、状態管理は各サンプルに同じコードを置いています。拠点IDと適用済み検索条件はURL、地図の位置指定モードはZustand、サーバーのデータはTanStack Queryで扱います。Zodのフォーム検証も両方で共通のルールを使います。
-
-- Orval版の [生成設定](orval/orval.config.ts) と [APIフック](orval/src/api/use-places.ts)
-- Hey API版の [生成設定](hey-api/openapi-ts.config.ts) と [APIフック](hey-api/src/api/use-places.ts)
+生成フックと生成オプション、キャッシュキー、HTTPエラーの違いをまとめています。 [Lv0の技術比較](../../docs/orval-hey-api-comparison.md#lv0-api呼び出しとキャッシュ)
 
 ## 比較の手順
 

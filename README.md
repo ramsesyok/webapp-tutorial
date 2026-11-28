@@ -14,6 +14,8 @@
 
 各レベルでは、講師が配布する対応版のGoバックエンドとOpenAPI定義を使います。実装例はOrval版とHey API版で同じ操作を試せます。レベル5以降の課題と講師向けのバックエンド改修計画は、[学習計画](tutorial-plan.md)にまとめています。
 
+生成コード、API呼び出し、キャッシュ、入力検証をレベルごとに比較できます。 [OrvalとHey APIの技術比較](docs/orval-hey-api-comparison.md)
+
 ## バックエンドの起動
 
 1. 講師から配布された実行ファイルを保存したフォルダでターミナルを開きます。Windows（PowerShell）では `.\webapp-tutorial.exe`、macOS・Linuxでは `./webapp-tutorial` を実行します。

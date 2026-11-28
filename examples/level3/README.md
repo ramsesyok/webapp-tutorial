@@ -34,10 +34,7 @@ Viteは `/api` と `/map` を `http://127.0.0.1:8080` に転送します。Vite�
 
 `npm run generate:api` は[レベル3のOpenAPI定義](../../schema/level3/openapi.yaml)からクライアントとZodスキーマを生成します。`npm run dev` と `npm run build` も実行前に生成します。
 
-- [Orval版のAPI呼び出し](orval/src/api/use-management.ts)は、生成フックの `select` でレスポンスの本文を取り出し、更新の入力を `data` で渡します。
-- [Hey API版のAPI呼び出し](hey-api/src/api/use-management.ts)は、生成されたオプションをTanStack Queryに渡します。クエリ結果はレスポンスの本文で、更新の入力は `body` で渡します。
-
-担当変更に成功したら、詳細、検索結果、変更履歴を再取得します。ユーザーの作成と無効化に成功したら、ユーザー一覧を再取得します。担当者を無効化するとセッションが失効します。担当割り当ては保持され、管理者が割り当て直すか解除できます。
+ユーザー管理と担当更新の呼び出し方、更新後の一覧・詳細・履歴の再取得をまとめています。 [Lv3の技術比較](../../docs/orval-hey-api-comparison.md#lv3-権限と複数の再取得)
 
 ## ブラウザーでの確認
 

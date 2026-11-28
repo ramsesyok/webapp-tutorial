@@ -28,13 +28,7 @@ Viteは `/api` と `/map` を `http://127.0.0.1:8080` に転送します。Vite�
 
 `npm run generate:api` は[レベル2のOpenAPI定義](../../schema/level2/openapi.yaml)からクライアントとZodスキーマを生成します。`npm run dev` と `npm run build` も実行前に生成します。
 
-| 比較する処理 | Orval版 | Hey API版 |
-| --- | --- | --- |
-| ログイン状態の取得 | 生成フック `useGetSession` を使い、`select` で `response.data` を取り出す | `getSessionOptions` を `useQuery` に渡すと、結果はユーザーの本文になる |
-| ログイン・ログアウト | `useCreateSession` と `useDeleteSession` を使う。ログイン入力は `data` で渡す | `createSessionMutation` と `deleteSessionMutation` を `useMutation` に渡す。ログイン入力は `body` で渡す |
-| `401` の扱い | `Error.info` の本文からエラーコードを読む | 生成オプションが返すエラー本文からエラーコードを読む |
-
-セッションAPIは [Orvalの呼び出し](orval/src/api/use-session.ts) と [Hey APIの呼び出し](hey-api/src/api/use-session.ts) を比較できます。ログイン画面と認証状態による表示の切り替えは、両版の `LoginForm.tsx` と `App.tsx` が同じです。セッションが無効になったときは `api/query-client.ts` で拠点のキャッシュを消去します。
+セッションAPIの呼び出し方、`401` の判定、キャッシュの扱いをまとめています。 [Lv2の技術比較](../../docs/orval-hey-api-comparison.md#lv2-cookieセッション)
 
 ## ブラウザーでの確認
 
