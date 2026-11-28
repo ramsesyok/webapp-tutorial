@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/oapi-codegen/runtime"
 )
@@ -26,15 +27,50 @@ const (
 
 // Defines values for ErrorCode.
 const (
+	FORBIDDEN          ErrorCode = "FORBIDDEN"
 	INVALIDCREDENTIALS ErrorCode = "INVALID_CREDENTIALS"
 	INVALIDINPUT       ErrorCode = "INVALID_INPUT"
 	INVALIDORIGIN      ErrorCode = "INVALID_ORIGIN"
+	LOGINIDTAKEN       ErrorCode = "LOGIN_ID_TAKEN"
 	PLACENOTFOUND      ErrorCode = "PLACE_NOT_FOUND"
 	UNAUTHENTICATED    ErrorCode = "UNAUTHENTICATED"
+	USERNOTFOUND       ErrorCode = "USER_NOT_FOUND"
 )
+
+// Defines values for UserRole.
+const (
+	Admin    UserRole = "admin"
+	Assignee UserRole = "assignee"
+)
+
+// AssigneeId 担当者のユーザーID。未割り当てはnull。
+type AssigneeId = int64
+
+// AssignmentChange defines model for AssignmentChange.
+type AssignmentChange struct {
+	ActorLoginId string `json:"actorLoginId"`
+
+	// ChangedAt 担当変更が行われた時刻。
+	ChangedAt               time.Time `json:"changedAt"`
+	Id                      int64     `json:"id"`
+	NewAssigneeLoginId      *string   `json:"newAssigneeLoginId"`
+	PreviousAssigneeLoginId *string   `json:"previousAssigneeLoginId"`
+}
+
+// AssignmentInput defines model for AssignmentInput.
+type AssignmentInput struct {
+	// AssigneeId 担当者のユーザーID。未割り当てはnull。
+	AssigneeId *AssigneeId `json:"assigneeId"`
+}
 
 // Category sightseeing は観光、nature は自然、food は食事。
 type Category string
+
+// CreateUserInput defines model for CreateUserInput.
+type CreateUserInput struct {
+	LoginId  string  `json:"loginId"`
+	Password *string `json:"password,omitempty"`
+}
 
 // Error defines model for Error.
 type Error struct {
@@ -60,6 +96,9 @@ type Memo = string
 
 // Place defines model for Place.
 type Place struct {
+	// AssigneeId 担当者のユーザーID。未割り当てはnull。
+	AssigneeId *AssigneeId `json:"assigneeId"`
+
 	// Category sightseeing は観光、nature は自然、food は食事。
 	Category Category `json:"category"`
 	Id       PlaceId  `json:"id"`
@@ -115,6 +154,9 @@ type PlaceMapFields struct {
 
 // PlaceSummary defines model for PlaceSummary.
 type PlaceSummary struct {
+	// AssigneeId 担当者のユーザーID。未割り当てはnull。
+	AssigneeId *AssigneeId `json:"assigneeId"`
+
 	// Category sightseeing は観光、nature は自然、food は食事。
 	Category Category `json:"category"`
 	Id       PlaceId  `json:"id"`
@@ -131,12 +173,25 @@ type PlaceSummary struct {
 
 // User defines model for User.
 type User struct {
-	Id      int64  `json:"id"`
+	Active  bool   `json:"active"`
+	Id      UserId `json:"id"`
 	LoginId string `json:"loginId"`
+
+	// Role admin は管理者、assignee は担当者。
+	Role UserRole `json:"role"`
 }
+
+// UserId defines model for UserId.
+type UserId = int64
+
+// UserRole admin は管理者、assignee は担当者。
+type UserRole string
 
 // BadRequest defines model for BadRequest.
 type BadRequest = Error
+
+// Forbidden defines model for Forbidden.
+type Forbidden = Error
 
 // InvalidOrigin defines model for InvalidOrigin.
 type InvalidOrigin = Error
@@ -149,6 +204,9 @@ type NotFound = Error
 
 // Unauthorized defines model for Unauthorized.
 type Unauthorized = Error
+
+// WriteForbidden defines model for WriteForbidden.
+type WriteForbidden = Error
 
 // ListPlacesParams defines parameters for ListPlaces.
 type ListPlacesParams struct {
@@ -166,8 +224,14 @@ type CreatePlaceJSONRequestBody = PlaceInput
 // UpdatePlaceJSONRequestBody defines body for UpdatePlace for application/json ContentType.
 type UpdatePlaceJSONRequestBody = PlaceInput
 
+// SetPlaceAssigneeJSONRequestBody defines body for SetPlaceAssignee for application/json ContentType.
+type SetPlaceAssigneeJSONRequestBody = AssignmentInput
+
 // CreateSessionJSONRequestBody defines body for CreateSession for application/json ContentType.
 type CreateSessionJSONRequestBody = LoginInput
+
+// CreateUserJSONRequestBody defines body for CreateUser for application/json ContentType.
+type CreateUserJSONRequestBody = CreateUserInput
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -186,6 +250,12 @@ type ServerInterface interface {
 	// 場所の登録内容を更新する
 	// (PUT /places/{placeId})
 	UpdatePlace(w http.ResponseWriter, r *http.Request, placeId PlaceId)
+	// 拠点の担当者を変更する
+	// (PUT /places/{placeId}/assignee)
+	SetPlaceAssignee(w http.ResponseWriter, r *http.Request, placeId PlaceId)
+	// 拠点の担当変更履歴を取得する
+	// (GET /places/{placeId}/assignment-history)
+	ListAssignmentHistory(w http.ResponseWriter, r *http.Request, placeId PlaceId)
 	// ログアウトする
 	// (DELETE /session)
 	DeleteSession(w http.ResponseWriter, r *http.Request)
@@ -195,6 +265,15 @@ type ServerInterface interface {
 	// ログインする
 	// (POST /session)
 	CreateSession(w http.ResponseWriter, r *http.Request)
+	// ユーザーの一覧を取得する
+	// (GET /users)
+	ListUsers(w http.ResponseWriter, r *http.Request)
+	// 担当者アカウントを作成する
+	// (POST /users)
+	CreateUser(w http.ResponseWriter, r *http.Request)
+	// 担当者アカウントを無効にする
+	// (PUT /users/{userId}/disabled)
+	DisableUser(w http.ResponseWriter, r *http.Request, userId UserId)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -360,6 +439,68 @@ func (siw *ServerInterfaceWrapper) UpdatePlace(w http.ResponseWriter, r *http.Re
 	handler.ServeHTTP(w, r)
 }
 
+// SetPlaceAssignee operation middleware
+func (siw *ServerInterfaceWrapper) SetPlaceAssignee(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "placeId" -------------
+	var placeId PlaceId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "placeId", r.PathValue("placeId"), &placeId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "placeId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetPlaceAssignee(w, r, placeId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAssignmentHistory operation middleware
+func (siw *ServerInterfaceWrapper) ListAssignmentHistory(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "placeId" -------------
+	var placeId PlaceId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "placeId", r.PathValue("placeId"), &placeId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "placeId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAssignmentHistory(w, r, placeId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // DeleteSession operation middleware
 func (siw *ServerInterfaceWrapper) DeleteSession(w http.ResponseWriter, r *http.Request) {
 
@@ -405,6 +546,77 @@ func (siw *ServerInterfaceWrapper) CreateSession(w http.ResponseWriter, r *http.
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateSession(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListUsers operation middleware
+func (siw *ServerInterfaceWrapper) ListUsers(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListUsers(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateUser operation middleware
+func (siw *ServerInterfaceWrapper) CreateUser(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateUser(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DisableUser operation middleware
+func (siw *ServerInterfaceWrapper) DisableUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "userId" -------------
+	var userId UserId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", r.PathValue("userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DisableUser(w, r, userId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -539,9 +751,14 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc("DELETE "+options.BaseURL+"/places/{placeId}", wrapper.DeletePlace)
 	m.HandleFunc("GET "+options.BaseURL+"/places/{placeId}", wrapper.GetPlace)
 	m.HandleFunc("PUT "+options.BaseURL+"/places/{placeId}", wrapper.UpdatePlace)
+	m.HandleFunc("PUT "+options.BaseURL+"/places/{placeId}/assignee", wrapper.SetPlaceAssignee)
+	m.HandleFunc("GET "+options.BaseURL+"/places/{placeId}/assignment-history", wrapper.ListAssignmentHistory)
 	m.HandleFunc("DELETE "+options.BaseURL+"/session", wrapper.DeleteSession)
 	m.HandleFunc("GET "+options.BaseURL+"/session", wrapper.GetSession)
 	m.HandleFunc("POST "+options.BaseURL+"/session", wrapper.CreateSession)
+	m.HandleFunc("GET "+options.BaseURL+"/users", wrapper.ListUsers)
+	m.HandleFunc("POST "+options.BaseURL+"/users", wrapper.CreateUser)
+	m.HandleFunc("PUT "+options.BaseURL+"/users/{userId}/disabled", wrapper.DisableUser)
 
 	return m
 }

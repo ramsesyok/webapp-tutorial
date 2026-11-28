@@ -37,4 +37,6 @@ go.work.sum
 /dist/
 /places.sqlite
 /places.sqlite-*
+/places-level3.sqlite
+/places-level3.sqlite-*
 /webapp-tutorial

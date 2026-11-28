@@ -38,10 +38,10 @@ func initializeDatabase(db *sql.DB, initialPassword string) error {
 	if err := tx.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil {
 		return err
 	}
-	if version == 2 {
+	if version == 3 {
 		return nil
 	}
-	if version != 0 && version != 1 {
+	if version < 0 || version > 3 {
 		return fmt.Errorf("unsupported database version %d", version)
 	}
 
@@ -65,7 +65,9 @@ func initializeDatabase(db *sql.DB, initialPassword string) error {
 		}
 	}
 
-	if _, err := tx.ExecContext(ctx, `
+	generated := false
+	if version < 2 {
+		if _, err := tx.ExecContext(ctx, `
 		CREATE TABLE users (
 			id INTEGER PRIMARY KEY,
 			login_id TEXT NOT NULL UNIQUE,
@@ -77,15 +79,39 @@ func initializeDatabase(db *sql.DB, initialPassword string) error {
 			user_id INTEGER NOT NULL REFERENCES users(id),
 			expires_at INTEGER NOT NULL
 		);
-		PRAGMA user_version = 2;
-	`); err != nil {
-		return err
+		`); err != nil {
+			return err
+		}
+		generated = initialPassword == ""
+		if generated {
+			initialPassword = randomToken(18)
+		}
+		if err := insertInitialUser(ctx, tx, initialPassword); err != nil {
+			return err
+		}
 	}
-	generated := initialPassword == ""
-	if generated {
-		initialPassword = randomToken(18)
-	}
-	if err := insertInitialUser(ctx, tx, initialPassword); err != nil {
+
+	// レベル2の初期アカウントを管理者にし、既存の拠点は未割り当てで引き継ぐ。
+	// 権限が変わるため、移行前のセッションは取り消して再ログインを求める。
+	if _, err := tx.ExecContext(ctx, `
+		ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'assignee'
+			CHECK (role IN ('admin', 'assignee'));
+		ALTER TABLE users ADD COLUMN active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1));
+		UPDATE users SET role = 'admin' WHERE login_id = ?;
+		DELETE FROM sessions;
+		ALTER TABLE places ADD COLUMN assignee_id INTEGER REFERENCES users(id);
+		CREATE INDEX places_by_assignee ON places (assignee_id);
+		CREATE TABLE assignment_history (
+			id INTEGER PRIMARY KEY,
+			place_id INTEGER NOT NULL,
+			previous_assignee_id INTEGER REFERENCES users(id),
+			new_assignee_id INTEGER REFERENCES users(id),
+			actor_id INTEGER NOT NULL REFERENCES users(id),
+			changed_at TEXT NOT NULL
+		);
+		CREATE INDEX assignment_history_by_place ON assignment_history (place_id, id);
+		PRAGMA user_version = 3;
+	`, initialLoginID); err != nil {
 		return err
 	}
 	if err := tx.Commit(); err != nil {
@@ -103,6 +129,6 @@ type rowScanner interface {
 
 func scanPlace(row rowScanner) (Place, error) {
 	var place Place
-	err := row.Scan(&place.Id, &place.Name, &place.Category, &place.Longitude, &place.Latitude, &place.Memo)
+	err := row.Scan(&place.Id, &place.Name, &place.Category, &place.Longitude, &place.Latitude, &place.Memo, &place.AssigneeId)
 	return place, err
 }
