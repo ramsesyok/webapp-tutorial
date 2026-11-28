@@ -1,0 +1,43 @@
+{
+  "title": "レベル0 Orval 09 — 保存後に一覧と地図が更新される理由",
+  "description": "登録・編集フォームからAPIを呼び、再取得した一覧がピンに反映されるまでを追います。",
+  "nextTour": "レベル0 Orval 10 — 確認ダイアログから削除する",
+  "steps": [
+    {
+      "file": "examples/level0/orval/src/PlaceEditor.tsx",
+      "pattern": "const \\[fields, setFields\\]",
+      "title": "フォームに入力途中の値を持つ",
+      "description": "`fields` はフォームの state です。経度と緯度は入力中に空欄や入力途中の文字を持てるよう文字列で管理します。`change` は他の項目を残したまま、変更した項目を更新します。"
+    },
+    {
+      "file": "examples/level0/orval/src/PlaceEditor.tsx",
+      "pattern": "const result = placeInputSchema\\.safeParse",
+      "title": "保存するときに数値へ変換して検証する",
+      "description": "保存時に座標の文字列を数値へ変換します。空欄は `NaN` にして、数値として通らないようにしています。`safeParse` の結果が失敗なら、項目ごとのメッセージを画面に出して送信を止めます。"
+    },
+    {
+      "file": "examples/level0/orval/src/PlaceEditor.tsx",
+      "pattern": "await onSave\\(result\\.data\\)",
+      "title": "非同期の保存をフォームから呼ぶ",
+      "description": "検証済みのデータで親の `onSave` を呼びます。処理中は `saving` で保存ボタンなどを無効にします。API が失敗するとフォームを開いたままエラーを出し、修正や再試行ができます。"
+    },
+    {
+      "file": "examples/level0/orval/src/App.tsx",
+      "pattern": "async function save\\(input:",
+      "title": "登録と編集でAPIを切り替える",
+      "description": "作成モードでは登録し、サーバーが返した場所の ID を選択します。編集モードでは編集中の ID を渡して更新します。`await` した処理が成功してから通知を設定して `editor` を空にします。サイドパネルのフォームが閉じ、一覧と詳細が再表示されます。"
+    },
+    {
+      "file": "examples/level0/orval/src/api/use-places.ts",
+      "pattern": "const invalidateLists",
+      "title": "保存前のキャッシュを無効にする",
+      "description": "登録と編集の成功後は `invalidateQueries` で検索条件ごとの一覧キャッシュを無効化し、画面で使用中の一覧を再取得します。編集では対象の詳細も無効化します。一覧のデータが変われば `App` が渡す `places` も変わり、一覧と地図のピンの両方に反映されます。"
+    },
+    {
+      "file": "examples/level0/orval/src/api/use-places.ts",
+      "pattern": "async update\\(id:",
+      "title": "ブラウザーで確かめる",
+      "description": "検索条件をクリアし、練習用の場所を1件登録します。編集で緯度 `100` を入れると緯度欄に理由が表示されます。有効な緯度と新しい名前で保存し、一覧と詳細の名前、地図のピン位置が変わることを確認します。練習用の場所は削除ツアーで使えます。"
+    }
+  ]
+}

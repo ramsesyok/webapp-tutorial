@@ -1,0 +1,36 @@
+{
+  "title": "レベル0 Orval 11 — 取得中・0件・通信エラーを見分ける",
+  "description": "画面の条件分岐とNetworkを使って、通信中、0件、失敗、再試行を確認します。",
+  "steps": [
+    {
+      "file": "examples/level0/orval/src/App.tsx",
+      "pattern": "\\{list\\.isPending &&",
+      "title": "一覧の状態ごとの表示を読む",
+      "description": "最初の取得結果を待つ間は `isPending` に応じた進行表示が出ます。取得失敗なら `isError`、成功して配列が空なら `isSuccess` と件数で表示を分けています。データを取得済みの状態での再取得もあり、`isFetching` は通信が進行中かを表します。"
+    },
+    {
+      "file": "examples/level0/orval/src/main.tsx",
+      "pattern": "queries: \\{ retry: false",
+      "title": "明示的な再試行を試せる設定を読む",
+      "description": "この教材では自動再試行とウィンドウに戻ったときの再取得を無効にしています。失敗したときは一覧の「再試行」が `list.refetch()` を呼びます。"
+    },
+    {
+      "file": "examples/level0/orval/src/places.ts",
+      "pattern": "export function errorMessage",
+      "title": "エラーの内容を画面表示につなぐ",
+      "description": "Orval の Fetch 設定は HTTP の非2xxを失敗として扱います。`errorMessage` は `info` やエラーに含まれる `message` を読み取り、取得できなければ既定の表示を返します。0件の応答は成功なので、この処理には入りません。"
+    },
+    {
+      "file": "examples/level0/orval/src/PlaceMap.tsx",
+      "pattern": "tiles\\.on\\('tileloaderror'",
+      "title": "地図の警告と一覧のエラーを見分ける",
+      "description": "背景地図の取得エラーは OpenLayers のイベントで扱い、地図内に警告が出ます。場所一覧とは別のリクエストです。Network で `/map/world.pmtiles` と `/api/places` を見分けましょう。"
+    },
+    {
+      "file": "examples/level0/orval/src/App.tsx",
+      "pattern": "list\\.refetch\\(\\)",
+      "title": "ブラウザーで確かめる",
+      "description": "存在しないキーワードを検索し、Network の `200` と空配列を確認します。Vite は起動したまま Go バックエンドを一時停止し、別のキーワードを検索して一覧のエラーを確認します。バックエンドを起動し直して「再試行」を押し、通信が成功することを確認します。取得中の表示を観察する場合は開発者ツールの通信速度制限を使い、終わったら元に戻します。"
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "title": "レベル0 Orval 08 — OpenAPIから一覧取得までを追う",
+  "description": "Swagger UIでAPIを試し、Orvalのコード生成からVite経由の通信までを追います。",
+  "nextTour": "レベル0 Orval 09 — 保存後に一覧と地図が更新される理由",
+  "steps": [
+    {
+      "file": "schema/openapi.yaml",
+      "pattern": "operationId: listPlaces",
+      "title": "API契約で検索と戻り値を確認する",
+      "description": "`servers` の `/api` と `paths` の `/places` が一覧取得の URL を構成します。`operationId` は操作名で、`q` と `category` は省略できるクエリパラメーターです。http://127.0.0.1:8080/swagger/ で一覧取得を実行し、成功時に `PlaceSummary` の配列が返ることを確認します。"
+    },
+    {
+      "file": "examples/level0/orval/package.json",
+      "pattern": "\"predev\"",
+      "title": "ツアー01の起動コマンドが何をするか読む",
+      "description": "`npm run dev` を実行すると、npm は先に `predev` を実行します。ここで Orval が OpenAPI 定義を読み、画面から使う API コードを作ります。その後 `dev` の Vite が開発サーバーを起動します。"
+    },
+    {
+      "file": "examples/level0/orval/orval.config.ts",
+      "pattern": "input: '\\.\\./\\.\\./\\.\\./schema/openapi\\.yaml'",
+      "title": "Orvalが何をどこへ生成するか読む",
+      "description": "この設定はレベル0の OpenAPI を入力に、Fetch を使う TanStack Query 向けコードを `src/api/generated/places.ts` に生成します。`npm run dev` で起動したあと、必要に応じてそのファイルを開いて `useListPlaces` を検索してください。"
+    },
+    {
+      "file": "examples/level0/orval/src/api/use-places.ts",
+      "pattern": "export function usePlaces",
+      "title": "生成フックを画面用のフックで包む",
+      "description": "画面用の `usePlaces` は検索条件を `useListPlaces` に渡し、`select` で HTTP レスポンスの `data` を取り出します。これで `App` の `list.data` から場所の配列を読めます。検索条件は一覧のクエリキーにも使われます。"
+    },
+    {
+      "file": "examples/level0/orval/src/api/use-places.ts",
+      "pattern": "export function usePlace\\(id:",
+      "title": "場所を選んだときだけ詳細を取得する",
+      "description": "詳細には一覧に含まれないメモなどが必要です。`enabled: id !== undefined` によって、選択 ID があるときだけ詳細を取得します。`id ?? 0` はフックに数値を渡すための値で、選択がない場合の取得は `enabled` が停止します。"
+    },
+    {
+      "file": "examples/level0/orval/vite.config.ts",
+      "pattern": "proxy: \\{",
+      "title": "画面からバックエンドまでの通信経路を読む",
+      "description": "ブラウザーは Vite の `127.0.0.1:5173` から画面を読み込みます。画面から `/api/places` を取得するときも、ブラウザーは同じポートにリクエストを送ります。`proxy` の設定に従って、Vite が `/api` と `/map` のリクエストを Go バックエンド（既定は `127.0.0.1:8080`）へ転送します。Swagger UI を開くときは、そのバックエンドに直接接続します。"
+    },
+    {
+      "file": "examples/level0/orval/src/App.tsx",
+      "pattern": "const list = usePlaces\\(filters\\)",
+      "title": "ブラウザーで確かめる",
+      "description": "Vite で開いた画面の開発者ツールで Network を開き、再読み込みして `/map/world.pmtiles` を探します。次に「ベルリン」などで検索し、`GET /api/places` のリクエスト URL、クエリ文字列、応答を確認します。リクエスト URL のポートを Swagger UI と比べましょう。検索結果の場所を選ぶと、`GET /api/places/{placeId}` の応答に `memo` が含まれます。"
+    }
+  ]
+}

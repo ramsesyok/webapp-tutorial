@@ -1,0 +1,31 @@
+{
+  "title": "レベル0 Orval 01 — ローカルで起動して画面とファイルを確認する",
+  "description": "サンプルを起動し、画面の入口と地図・一覧・詳細を担当するファイルを見つけます。",
+  "nextTour": "レベル0 Orval 02 — Reactアプリの入口と画面構成",
+  "steps": [
+    {
+      "file": "examples/level0/README.md",
+      "pattern": "\\*\\*Orval版\\*\\*",
+      "title": "起動するターミナルを分ける",
+      "description": "配布されたレベル0の Go バックエンドを起動します。起動方法はこの README の「バックエンドの起動」リンクから確認できます。次に、別のターミナルをリポジトリのルートで開き、下の Orval 版のコマンドを実行します。最後のコマンドを実行したまま、ブラウザーで http://127.0.0.1:5173/ を開いてください。"
+    },
+    {
+      "file": "examples/level0/orval/index.html",
+      "pattern": "src=\"/src/main\\.tsx\"",
+      "title": "ブラウザーが最初に読むファイルを見つける",
+      "description": "このサンプルの入口は `index.html` です。ここから `src/main.tsx` が読み込まれ、React が起動します。VS Code のエクスプローラーで `examples/level0/orval` を展開し、直下の `index.html` と `src` の中にある `main.tsx` の位置を確認しましょう。"
+    },
+    {
+      "file": "examples/level0/orval/src/main.tsx",
+      "pattern": "<App />",
+      "title": "画面全体と地図を担当するファイルを見つける",
+      "description": "`main.tsx` の `<App />` が、画面全体を組み立てる部品（コンポーネント）です。`App.tsx` には地図・一覧・詳細の配置があり、地図の中身は `PlaceMap.tsx` が担当します。`src` の中で、この2つのファイルを見つけましょう。"
+    },
+    {
+      "file": "examples/level0/orval/src/App.tsx",
+      "pattern": "id=\"map-title\"",
+      "title": "ブラウザーで確かめる",
+      "description": "ブラウザーの「世界地図」という見出しを、このファイルの同じ文字と照らし合わせます。次に一覧から場所を1件選び、地図のピンと「場所の詳細」がどう変わるか見てみましょう。ツアー02では `index.html` から `App.tsx` までのコードを順に読みます。"
+    }
+  ]
+}

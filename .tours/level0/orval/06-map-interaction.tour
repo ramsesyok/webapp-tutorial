@@ -1,0 +1,49 @@
+{
+  "title": "レベル0 Orval 06 — 地図のクリックを一覧・詳細・登録フォームにつなぐ",
+  "description": "ピンの選択と登録座標の指定を、クリックから画面表示まで追います。",
+  "nextTour": "レベル0 Orval 07 — 検索条件と選択をURLから復元する",
+  "steps": [
+    {
+      "file": "examples/level0/orval/src/App.tsx",
+      "pattern": "<ListItemButton key=\\{place\\.id\\}",
+      "title": "一覧での選択をたどる",
+      "description": "一覧のクリックは `select(place.id)` を実行します。`select` が URL の `place` を更新し、`App` がその URL から `selectedId` を読み直します。この ID が一覧項目と地図のピンの強調に使われます。"
+    },
+    {
+      "file": "examples/level0/orval/src/PlaceMap.tsx",
+      "pattern": "const id = map\\.forEachFeatureAtPixel",
+      "title": "地図での選択も同じ処理につなぐ",
+      "description": "クリックした画面上の位置からピンのレイヤーだけを調べ、見つかったピンの ID を `onSelect` へ渡します。`App` が `onSelect` を受け取り、登録・編集フォームを表示していないときに、一覧と同じ `select(id)` を呼びます。"
+    },
+    {
+      "file": "examples/level0/orval/src/PlaceMap.tsx",
+      "pattern": "actions\\.current =",
+      "title": "地図のイベントから最新のコールバックを呼ぶ",
+      "description": "地図のクリックイベントは地図を作る Effect で登録します。React が新しい props を渡すと `actions.current` が更新されるので、登録済みのイベント処理がクリック時点で最新の `onSelect` と `onPick` を呼べます。"
+    },
+    {
+      "file": "examples/level0/orval/src/PlaceMap.tsx",
+      "pattern": "mapRef\\.current\\?\\.getView\\(\\)\\.animate",
+      "title": "選んだ場所に地図を移動する",
+      "description": "親から渡された場所の経度・緯度が変わると、その場所を中心に地図の表示範囲を動かします。ピンの強調には `selectedId`、中心の移動には座標を使います。"
+    },
+    {
+      "file": "examples/level0/orval/src/map-store.ts",
+      "pattern": "export const useMapStore",
+      "title": "位置指定モードを画面と地図で共有する",
+      "description": "「場所を追加」を押すと `App` が `picking` を `true` にします。`App` は位置指定の案内、`PlaceMap` はカーソル用のクラスをこの値で切り替えます。地図のイベントは `getState()` でクリック時点の値を読みます。"
+    },
+    {
+      "file": "examples/level0/orval/src/PlaceMap.tsx",
+      "pattern": "const \\[longitude, latitude\\] = toLonLat",
+      "title": "クリック座標をフォームへ渡す",
+      "description": "位置指定モードでは `toLonLat` で地図の座標を経度・緯度へ戻し、小数第6位までに丸めて `onPick` に渡します。`App` はモードを終了し、座標付きの `editor` をセットします。`PlaceEditor` はその座標を入力欄の初期値にします。"
+    },
+    {
+      "file": "examples/level0/orval/src/App.tsx",
+      "pattern": "onPick=\\{\\(coordinates\\)",
+      "title": "ブラウザーで確かめる",
+      "description": "一覧の項目を選ぶ、別のピンを選ぶ、の順に操作し、ピンの強調、地図の中心と詳細を確認します。続いて「場所を追加」を押して地図をクリックし、入力欄に経度・緯度が入っていることを確認してキャンセルします。"
+    }
+  ]
+}

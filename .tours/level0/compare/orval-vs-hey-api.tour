@@ -1,0 +1,84 @@
+{
+  "title": "レベル0 技術比較 — OrvalとHey API",
+  "description": "同じOpenAPIと画面で、生成設定、取得・更新、キャッシュ、HTTPエラー、フォーム検証を比較します。",
+  "steps": [
+    {
+      "file": "schema/openapi.yaml",
+      "pattern": "operationId: listPlaces",
+      "title": "比較条件をそろえる",
+      "description": "両版は `schema/openapi.yaml` と同じレベル0バックエンドを使います。`listPlaces`、`getPlace`、`createPlace`、`updatePlace`、`deletePlace` の5操作を、同じ条件・同じデータで比較します。画面が呼ぶ入口は両版とも `src/api/use-places.ts` の `usePlaces`、`usePlace`、`usePlaceMutations` です。"
+    },
+    {
+      "file": "examples/level0/orval/orval.config.ts",
+      "pattern": "client: 'react-query'",
+      "title": "Orvalの生成設定と成果物",
+      "description": "この例は Orval `8.49.0` を使います。`client: 'react-query'` と `httpClient: 'fetch'` を選び、モデル型、Fetch 関数、Query／Mutation フック、キー生成関数を `src/api/generated/places.ts` に出力します。`getBaseUrlFromSpecification` で OpenAPI の `servers` にある `/api` を取り込みます。両版とも各サンプルで `npm ci` のあと `npm run generate:api` を実行すると生成物を読めます。"
+    },
+    {
+      "file": "examples/level0/hey-api/openapi-ts.config.ts",
+      "pattern": "'@hey-api/typescript'",
+      "title": "Hey APIの生成設定と成果物",
+      "description": "この例は `@hey-api/openapi-ts` `0.99.0` を使います。TypeScript 型、Fetch クライアント、SDK、TanStack Query のオプション生成をプラグインごとに指定します。`src/api/generated/@tanstack/react-query.gen.ts` から参照先の SDK をたどり、型、HTTP 呼び出し、Query 設定がどこに出力されるかを Orval と見比べます。 [Hey APIの生成設定](https://heyapi.dev/docs/openapi/typescript/get-started)"
+    },
+    {
+      "file": "examples/level0/orval/src/api/use-places.ts",
+      "pattern": "return useListPlaces\\(filters",
+      "title": "取得時の戻り値を比較する ― Orval",
+      "description": "`useListPlaces(filters, { query: { select } })` のように、生成フックを呼びます。Fetch 関数の成功結果は `data`・`status`・`headers` を持ちます。`select` で画面に返す値を本文に絞ります。キャッシュには Query 関数が返したレスポンスの形が保持されます。 [TanStack Queryのselect](https://tanstack.com/query/latest/docs/framework/react/reference/functions/useQuery)"
+    },
+    {
+      "file": "examples/level0/hey-api/src/api/use-places.ts",
+      "pattern": "return useQuery\\(listPlacesOptions",
+      "title": "取得時の戻り値を比較する ― Hey API",
+      "description": "`listPlacesOptions({ query: filters })` が返す設定を、自分でインポートした `useQuery` に渡します。生成した Query 関数が SDK の結果から本文を返すので、キャッシュと画面の `data` には本文が入ります。詳細では `getPlaceOptions({ path: { placeId } })` に `enabled` を追加します。Orval 版も `enabled: id !== undefined` で未選択時の詳細取得を抑えます。"
+    },
+    {
+      "file": "examples/level0/orval/src/api/use-places.ts",
+      "pattern": "update\\.mutateAsync\\(\\{ placeId: id, data: body \\}\\)",
+      "title": "更新の引数と成功結果を比較する ― Orval",
+      "description": "`useUpdatePlace()` を生成フックとして呼び、`mutateAsync({ placeId: id, data: body })` にパス変数と本文を渡します。成功結果から `response.data` を取り出して画面へ返します。登録は `{ data: body }`、削除は `{ placeId: id }` を渡します。"
+    },
+    {
+      "file": "examples/level0/hey-api/src/api/use-places.ts",
+      "pattern": "update\\.mutateAsync\\(\\{ path: \\{ placeId: id \\}, body \\}\\)",
+      "title": "更新の引数と成功結果を比較する ― Hey API",
+      "description": "`useMutation(updatePlaceMutation())` で生成オプションを渡し、`mutateAsync({ path: { placeId: id }, body })` でパスと本文を指定します。解決値が本文なのでそのまま画面へ返します。登録は `{ body }`、削除は `{ path: { placeId: id } }` を渡します。引数の配置が違っても、同じ `PUT /api/places/{placeId}` と JSON 本文が送られます。"
+    },
+    {
+      "file": "examples/level0/orval/src/api/use-places.ts",
+      "pattern": "const invalidateLists = \\(\\) => client\\.invalidateQueries",
+      "title": "キャッシュの一致条件を比較する ― Orval",
+      "description": "`getListPlacesQueryKey()` が返す `['/api/places']` は、検索条件を含む `['/api/places', filters]` にも部分一致します。更新時は対象 ID の `getGetPlaceQueryKey(id)` に `exact: true` を指定し、一覧と詳細を `Promise.all` で無効化します。削除時は同じ詳細キーを `removeQueries` で取り除き、一覧を無効化します。"
+    },
+    {
+      "file": "examples/level0/hey-api/src/api/use-places.ts",
+      "pattern": "const invalidateLists = \\(\\) => client\\.invalidateQueries",
+      "title": "キャッシュの一致条件を比較する ― Hey API",
+      "description": "対応する生成関数は `listPlacesQueryKey()` と `getPlaceQueryKey({ path: { placeId: id } })` です。登録・更新・削除後に無効化する範囲は両版で同じです。既定では一致したクエリを無効化し、そのうち有効な購読があるクエリを再取得します。検索候補の場所を増減させて、現在表示中の一覧がサーバーから更新されることを検証できます。 [TanStack Queryの無効化](https://tanstack.com/query/latest/docs/framework/react/guides/query-invalidation)"
+    },
+    {
+      "file": "examples/level0/orval/src/places.ts",
+      "pattern": "export function errorMessage",
+      "title": "失敗したHTTP応答が画面へ届く経路",
+      "description": "Orval は `forceSuccessResponse` で非2xxを失敗扱いにし、エラーの `info` に本文、`status` にHTTPステータスを入れます。Hey API では生成した Query／Mutation 関数が Fetch クライアント側に `throwOnError` を渡すため、非2xxの本文が例外になります。画面は共通の `errorMessage` で本文の `message` を取り出します。ここでの `throwOnError` は Fetch クライアントの設定です。Query 失敗は画面の `isError`、保存失敗はフォームの `catch` で表示します。 [OrvalのFetch設定](https://orval.dev/docs/reference/configuration/output/#forcesuccessresponse)"
+    },
+    {
+      "file": "examples/level0/orval/src/PlaceEditor.tsx",
+      "pattern": "const result = placeInputSchema\\.safeParse",
+      "title": "生成型と手書きZodの責務を確認する",
+      "description": "Level 0 の `places.ts` にある `placeInputSchema` は両版共通の手書き定義です。`PlaceEditor` は座標を数値へ変換し、`safeParse` が成功した値だけを API に渡します。生成された OpenAPI の TypeScript 型は呼び出しを型検査し、実行時のフォーム入力は手書きスキーマで検証します。OpenAPI の制約を変更する場合は、生成された型とフォームの検証ルールをそれぞれ確認します。"
+    },
+    {
+      "file": "examples/level0/README.md",
+      "pattern": "## 比較の手順",
+      "title": "同じブラウザー操作で通信を比較する",
+      "description": "同じバックエンドに接続し、Orval 版を `5173`、Hey API 版を `5174` で開きます。Network で GET の検索条件と応答を比較します。各版で練習用レコードの座標を編集し、PUT の成功後に一覧と表示中の詳細の GET が再送され、ピンが移ることを確認します。別タブで練習用レコードを削除してから開いていた編集フォームを保存すると、サーバーの `404` と画面メッセージを比較できます。緯度 `100` では項目エラーが表示され、PUT が送られないことも確認します。"
+    },
+    {
+      "file": "tutorial-plan.md",
+      "pattern": "\\| \\*\\*4 ／ v4\\.x\\*\\*",
+      "title": "レベル4の採用検討で比較する項目",
+      "description": "Level 0 は、取り込みやすさ、HTTP エラーの扱い、キャッシュ更新を比較する基準にします。レベル4では、生成した Zod スキーマの組み込み方、詳細の `ETag` を読み更新の `If-Match` に渡す経路、`412` の判定と表示、保存後の再取得を両版で検証します。生成物と手書きコードをまたぐときの追いやすさも評価し、採用はレベル4の実装後に判断します。"
+    }
+  ]
+}
