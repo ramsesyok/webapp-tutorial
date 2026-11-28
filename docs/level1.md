@@ -11,7 +11,7 @@
 
 ## 準備
 
-1. [レベル0で作成したSPA](level0.md)を用意し、レベル1の配布バックエンドを[共通の起動手順](../README.md#バックエンドの起動)で起動します。ソースから起動する場合は、レベル1の配布タグを使います。
+1. [レベル0で作成したSPA](level0.md)を用意し、レベル1の配布バックエンドを[共通の起動手順](README.md#バックエンドの起動)で起動します。ソースから起動する場合は、レベル1の配布タグを使います。
 2. [レベル1のOpenAPI定義](../schema/level1/openapi.yaml)を開き、`PlaceInput` と `InvalidPlaceInput` を確認します。`POST /api/places` と `PUT /api/places/{placeId}` の入力不正時に、`400` の本文へ `fieldErrors` が付く場合があります。
 3. クライアントとZodスキーマをレベル1の定義から生成します。実装例では `npm run generate:api` を実行します。 [起動・生成手順](../examples/level1/README.md) · [OrvalとHey APIの技術比較](orval-hey-api-comparison.md#lv1-フォームと生成zod)
 
