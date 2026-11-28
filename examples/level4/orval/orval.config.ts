@@ -9,6 +9,7 @@ export default defineConfig({
       target: 'src/api/generated/places.ts',
       client: 'react-query',
       httpClient: 'fetch',
+      headers: true,
       baseUrl: { getBaseUrlFromSpecification: true },
       override: {
         // 非2xxをrejectし、生成フックのisErrorでHTTPエラーを扱う。
