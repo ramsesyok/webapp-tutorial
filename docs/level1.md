@@ -13,7 +13,7 @@
 
 1. [レベル0で作成したSPA](level0.md)を用意し、レベル1の配布バックエンドを[共通の起動手順](../README.md#バックエンドの起動)で起動します。ソースから起動する場合は、レベル1の配布タグを使います。
 2. [レベル1のOpenAPI定義](../schema/level1/openapi.yaml)を開き、`PlaceInput` と `InvalidPlaceInput` を確認します。`POST /api/places` と `PUT /api/places/{placeId}` の入力不正時に、`400` の本文へ `fieldErrors` が付く場合があります。
-3. クライアントとZodスキーマをレベル1の定義から生成します。実装例では `npm run generate:api` を実行します。OrvalとHey APIの設定や起動コマンドは[レベル1のSPA実装例](../examples/level1/README.md)を参照してください。
+3. クライアントとZodスキーマをレベル1の定義から生成します。実装例では `npm run generate:api` を実行します。 [起動・生成手順](../examples/level1/README.md) · [OrvalとHey APIの技術比較](orval-hey-api-comparison.md#lv1-フォームと生成zod)
 
 ## Step 1 — 保存済みの値から下書きを作る
 

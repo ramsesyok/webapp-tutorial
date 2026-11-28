@@ -147,16 +147,7 @@ OpenLayersの `Draw` で単一の多角形を描き、`Modify` で頂点を追�
 
 ### OrvalとHey APIの比較
 
-レベル4のOpenAPI定義から、名前・担当者・多角形を持つエリアAPIを生成する。両版の画面と操作を揃え、APIを呼び出すフックで差を確認できるようにする。
-
-| 比較する処理 | Orval 8.49.0 | Hey API 0.99.0 |
-| --- | --- | --- |
-| 入力のZod検証 | `UpdateAreaBody`。固定長の配列は長さの制約で検証 | `zUpdateAreaBody`。固定長の配列はタプルとして生成。担当者IDの `int64` は検証後に `bigint` からJSONで送れる `number` へ変換 |
-| 詳細取得 | 生成フックで本文と `headers.get('ETag')` を取得 | 生成クエリは本文を返す。詳細には生成SDKの `getArea` を `responseStyle: 'fields'` で呼ぶクエリを用意し、`response.headers` から取得 |
-| 更新と競合表示 | `output.headers: true` で生成した `useUpdateArea` に型付きの `headers['If-Match']` を渡す。`error.status` と `error.info` を参照 | 生成ミューテーションの型付き `headers['If-Match']` に渡す。例外はエラー本文なので `code` で判定 |
-| 再取得 | 生成キーで一覧・詳細を無効化 | 生成キーで一覧・詳細を無効化。ヘッダー付きの詳細用クエリにも生成キーを使う |
-
-試作ではTypeScriptの型検査を通し、モック通信で両方式の `ETag` 取得、`If-Match` の送信、`412` の判定を確認した。生成したZodが2要素の座標を受け付け、3要素の座標を拒否することも確認した。採用方式は、両版を実装して画面からZod検証、保存、再取得、競合表示までのコードの追いやすさを比較した後に確定する。
+両版で同じ保存操作を試し、生成Zod、キャッシュ再取得、`ETag` と `If-Match`、`412` の表示までを追って採用方式を検討する。 [Lv4の技術比較](docs/orval-hey-api-comparison.md#lv4-担当エリアの編集競合)
 
 ### 演習の進め方と確認
 
